@@ -1,0 +1,9 @@
+data/
+__pycache__/
+.ipynb_checkpoints/
+
+*.ipynb
+
+cp-1-0.tgz
+download_s3_data.py
+untitled.txt
