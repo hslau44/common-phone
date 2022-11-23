@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # TODO: Address all TODOs and remove all explanatory comments
-"""TODO: Add a description here."""
+"""
+TODO: Add a description here.
+
+"""
 
 
 import csv
@@ -162,7 +165,7 @@ class CommonPhone(datasets.GeneratorBasedBuilder):
         
         split_type = {"train": datasets.Split.TRAIN, "validation": datasets.Split.TEST, "test": datasets.Split.TEST}
         
-        for split,url in _URLS.items():
+        for split,url in _DATA_URLS.items():
             audio_path[split] = dl_manager.download(url)
             local_extracted_archive[split] = dl_manager.extract(audio_path[split]) if not dl_manager.is_streaming else None
         
@@ -176,8 +179,8 @@ class CommonPhone(datasets.GeneratorBasedBuilder):
             datasets.SplitGenerator(
                 name=split_type[split],
                 gen_kwargs={
-                    "local_extracted_archive": local_extracted_archive[split],
-                    "audio_files": dl_manager.iter_archive(audio_path[split]),
+                    "local_extracted_archive": local_extracted_archive[split], # 
+                    "audio_files": dl_manager.iter_archive(audio_path[split]), # all audio path in str 
                     "metadata_path": dl_manager.download_and_extract(metadata_path[split]),
                     "path_to_clips": path_to_clips,
                 },
@@ -186,22 +189,48 @@ class CommonPhone(datasets.GeneratorBasedBuilder):
     
 
     # method parameters are unpacked from `gen_kwargs` as given in `_split_generators`
-    def _generate_examples(self, filepath, split):
+    def _generate_examples(
+        self, 
+        local_extracted_archive,
+        audio_files,
+        metadata_path,
+        path_to_clips,
+    ):
         # TODO: This method handles input defined in _split_generators to yield (key, example) tuples from the dataset.
         # The `key` is for legacy reasons (tfds) and is not important in itself, but must be unique for each example.
-        with open(filepath, encoding="utf-8") as f:
-            for key, row in enumerate(f):
-                data = json.loads(row)
-                if self.config.name == "first_domain":
-                    # Yields examples as (key, example) tuples
-                    yield key, {
-                        "sentence": data["sentence"],
-                        "option1": data["option1"],
-                        "answer": "" if split == "test" else data["answer"],
+        metadata = {}
+        with open(metadata_path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if self.config.name == "_all_" or self.config.name == row["language"]:
+                    
+                    phonemes = read_dic_from_str(row["phonetic_detail"])
+                
+                    example = {
+                        'file_name': row['file_name'], 
+                        'text': row['text'], 
+                        'gender': row['gender'], 
+                        'age': row['age'], 
+                        'locale': row['locale'], 
+                        'accent': row['accent'], 
+                        'set': row['set'],
+                        "phonetic_detail": phonemes
+                        'src_file_name': row['src_file_name'], 
                     }
-                else:
-                    yield key, {
-                        "sentence": data["sentence"],
-                        "option2": data["option2"],
-                        "second_domain_answer": "" if split == "test" else data["second_domain_answer"],
-                    }
+                    
+                    metadata[row['file_name']] = example
+        
+        id_ = 0
+        for path, f in audio_files:
+            if path in metadata:
+                example = metadata[path]
+                # set the audio feature and the path to the extracted file
+                path = os.path.join(local_extracted_archive, path) if local_extracted_archive else path
+                example["audio"] = {"path": path, "bytes": f.read()}
+                example["path"] = path
+                yield id_, example
+                id_ += 1
+
+                
+def _read_dic_from_str(string):
+    return eval(string)
