@@ -5,7 +5,7 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 
 
-def get_map(data,pad=None):
+def get_vocab_dict(data,pad=None):
     pad = 'PAD' if pad is None else pad
     dictionary = {pad:0}
     lb = 1
@@ -28,6 +28,7 @@ def tokenize(phonemes_detal,mapping,t_end,res):
         b = int(np.round(b/(t_end/res)))
         arr[a:b] = [mapping[label]]*len(arr[a:b])
     return arr
+
 
 
 class PhonemeSegmentationDataset(Dataset):
