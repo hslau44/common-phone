@@ -20,7 +20,7 @@ def get_vocab_dict(data,pad=None):
     return dictionary
 
 
-def tokenize(phonemes_detal,mapping,t_end,res):
+def get_phonemes_segment(phonemes_detal,mapping,t_end,res):
     arr = [0]*res
     phonemes_detal = eval(row['phonetic_detail']) if type(row['phonetic_detail']) is not dict else row['phonetic_detail']
     for a,b,label in zip(phonemes_detal['start'],phonemes_detal['end'],phonemes_detal['label']):
