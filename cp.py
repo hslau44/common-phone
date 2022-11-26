@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 import torch 
 from tqdm import tqdm
 from torch.utils.data import Dataset
@@ -39,6 +40,22 @@ def get_phonemes_string(phonemes_detal):
     phonemes_detal = eval(phonemes_detal) if type(phonemes_detal) is not dict else phonemes_detal
     processed_string = char_processing(phonemes_detal['label'])
     return processed_string
+
+
+def get_metadata(path,_set=None,_locale=None):
+    metadata = pd.read_csv(path)
+    if _set is not None:
+        metadata = metadata[(metadata['set'] == _set)]
+        if isinstance(_set,list):
+            metadata = metadata[(metadata['set'].isin(_set))]
+        else:
+            metadata = metadata[(metadata['set'] == _set)]
+    if _locale is not None:
+        if isinstance(_locale,list):
+            metadata = metadata[(metadata['set'].isin(_locale))]
+        else:
+            metadata = metadata[(metadata['locale'] == _locale)]
+    return metadata
 
 
 def evaluation(model,processor,rows,data_dir='data',verbose=True,return_report=False):
