@@ -1,5 +1,7 @@
 soundfile
+jiwer
 librosa
 praatio
 transformers
 datasets
+evaluate
