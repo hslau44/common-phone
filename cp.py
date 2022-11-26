@@ -30,6 +30,15 @@ def get_phonemes_segment(phonemes_detal,mapping,t_end,res):
     return arr
 
 
+def char_processing(chars):
+    return "".join([c if c != '(...)' else ' ' for c in chars])
+
+
+def get_phonemes_string(phonemes_detal):
+    phonemes_detal = eval(phonemes_detal) if type(phonemes_detal) is not dict else phonemes_detal
+    processed_string = char_processing(phonemes_detal['label'])
+    return processed_string
+
 
 class PhonemeSegmentationDataset(Dataset):
     
