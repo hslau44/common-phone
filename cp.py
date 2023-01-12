@@ -25,7 +25,7 @@ def get_vocab_dict(data,pad=None):
 
 def get_phonemes_segment(phonemes_detal,mapping,t_end,res):
     arr = [0]*res
-    phonemes_detal = eval(row['phonetic_detail']) if type(row['phonetic_detail']) is not dict else row['phonetic_detail']
+    phonemes_detal = eval(phonemes_detal) if type(phonemes_detal) is not dict else phonemes_detal
     for a,b,label in zip(phonemes_detal['start'],phonemes_detal['end'],phonemes_detal['label']):
         a = int(np.round(a/(t_end/res)))
         b = int(np.round(b/(t_end/res)))
