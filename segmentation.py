@@ -1,4 +1,5 @@
 import os
+import argparse
 import json
 import numpy as np
 import pandas as pd
@@ -19,10 +20,30 @@ from transformers import (
 from datasets import load_dataset
 import evaluate
 from sklearn import metrics
-from utils import write_json
+from utils import write_json, read_json
 
 
 def get_metadata(path,_set=None,_locale=None):
+    """
+    Return metadata with specific set and locale
+    
+    Args
+    ----
+        path : str
+            filepath of metadata.csv
+        _set : str/list[str]/bool
+            the set(s) it contains, only support combination 
+            of ['train','dev','test'], default None to select 
+            all sets
+        _locale:
+            the locale(s) it contain, default None to select 
+            all sets
+    
+    Return
+    ------
+        metadata : pd.DataFrame
+            selected metadata 
+    """
     metadata = pd.read_csv(path)
     if _set is not None:
         metadata = metadata[(metadata['set'] == _set)]
@@ -39,6 +60,34 @@ def get_metadata(path,_set=None,_locale=None):
 
 
 def get_vocab_dict(data,pad=None,unk=None):
+    """
+    Return dictionary of token from a sequence of 
+    phonemes_detail in the metadata
+    
+    Args
+    ----
+        data : list[str]
+            sequence of phonemes_detail, this method will transform
+            the string in phonemes_detail as dict 
+        pad : str
+            padding tokken, default : 'PAD'
+        unk: str
+            unknown tokken, default : 'UNK'
+    
+    Return
+    ------
+        vocab_dict : dict
+            dictionary of token
+            
+    Example
+    -------
+    
+        pad = '[PAD]'
+        unk = '[UNK]'
+        data = metadata['phonemes_detail']
+        vocab_dict = get_vocab_dict(data,pad,unk)
+        
+    """
     pad = 'PAD' if pad is None else pad
     unk = 'UNK' if unk is None else unk
     dictionary = {pad:0}
@@ -55,7 +104,32 @@ def get_vocab_dict(data,pad=None,unk=None):
 
 
 class PhonemeSegmentor:
+    """
+    Return dictionary of token from single 
+    phonemes_detail in the metadata
     
+    Attributes
+    ----
+        data : list[str]
+            sequence of phonemes_detail, this method will 
+            transform
+            the string in phonemes_detail as dict 
+        pad : str
+            padding tokken, default : 'PAD'
+        unk: str
+            unknown tokken, default : 'UNK'
+    
+    Methods
+    ------
+        encode(phonemes_detal,**kwargs)
+            tokenize and place the token into segment of array 
+            accordingly
+        
+        decode(arr)
+            decode the array and return a dict in the form of 
+            phonemes_detail
+
+    """
     def __init__(self,tokenizer,resolution,t_end=None,pad_token="[PAD]"):
         self.tokenizer = tokenizer
         self.t_end = t_end
@@ -227,6 +301,7 @@ def nll_loss(logits,labels):
 
 # metric
 def avg_sample_acc(predictions, references):
+    """calculate the accuracy of each sample in a batch and average the score"""
     assert len(predictions) == len(references), f"length not equal: {len(predictions)} != {len(references)}"
     assert len(predictions.shape) == 3 and len(references.shape) == 2
     assert predictions.shape[1] == references.shape[1]
@@ -237,6 +312,7 @@ def avg_sample_acc(predictions, references):
     
 
 def compute_avg_sample_acc(pred):
+    """wrapping function to feed HF style prediction into metric """
     p = pred.predictions
     r = pred.label_ids
     return avg_sample_acc(p, r)
@@ -286,33 +362,38 @@ def test_dataflow(model,dataset,data_collator,batch_size=2):
 
 if __name__ == "__main__":
     
-    model_checkpoint = "speech31/wav2vec2-large-english-phoneme-v2"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--resolution", type=float, default=0.02)
+    parser.add_argument("--manual_t_end", type=float, default=8.0)
+    parser.add_argument("--pad_to_sec", type=float, default=1.0)
+    parser.add_argument("--sampling_rate", type=int, default=16000)
+    parser.add_argument("--model_checkpoint", default=None)
+    parser.add_argument("--training_config_fp", default=None)
+    args, _ = parser.parse_known_args()
+    
+    if args.model_checkpoint is not None:
+        model_checkpoint = args.model_checkpoint
+    else: 
+        model_checkpoint = "speech31/wav2vec2-large-english-phoneme-v2"
+    
+    print(f"Using checkpoint: {model_checkpoint}")
+    
+    if args.training_config_fp is not None:
+        training_config = read_json(args.training_config_fp)
+        print(f"Using given training configurations")
+    else:
+        training_config = read_json('training_config.json')
+        print(f"Using default training configurations")
+        
+    
+    
     PATH = 'data/metadata.csv'
     repo_name = 'hslau44/common-phone-dev'
     output_dir = 'outputs/exp_01'
-
-    seed = 42
-    num_train_epochs = 1
-    batch_size = 8
-    per_device_train_batch_size = batch_size # maximum 16 for g4dn.xlarge
-    per_device_eval_batch_size = batch_size
-    evaluation_strategy = 'epoch'
-    save_strategy='epoch'
-    logging_strategy='steps'
-    action_step = 10
-    save_steps = action_step
-    eval_steps = action_step
-    logging_steps = action_step
-    learning_rate = 0.0003
-    adam_beta1,adam_beta2 = 0.9,0.999
-    adam_epsilon = 1e-08
-    weight_decay = 0.005
-    lr_scheduler_type ='linear'
-    warmup_steps = 0
     
-    torch.backends.cuda.matmul.allow_tf32 = True
-    
+    # compute config
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    torch.backends.cuda.matmul.allow_tf32 = torch.cuda.is_available()
     output_mdl_dir = os.path.join(output_dir,'models')
     output_log_dir = os.path.join(output_dir,'logs')
     hf_config = AutoConfig.from_pretrained(model_checkpoint)
@@ -335,55 +416,32 @@ if __name__ == "__main__":
     trainset  = PhonemeDetailsDataset(train_metadata)
     validaset = PhonemeDetailsDataset(valid_metadata)
     
-    resolution = 0.02
-    manual_t_end = 8
+    sampling_rate=args.sampling_rate
+    resolution=args.resolution
+    t_end=args.manual_t_end
+    pad_to_sec=args.pad_to_sec
+    
     segmentor = PhonemeSegmentor(tokenizer=tokenizer,resolution=resolution,pad_token=pad_token)
     data_collator = TrainingDataProcessor(
-        sampling_rate=16000,
-        resolution=resolution,
-        t_end=manual_t_end,
-        pad_to_sec=1.0,
-        tokenizer=segmentor
+        sampling_rate=sampling_rate,
+        resolution=resolution, 
+        t_end=t_end, 
+        pad_to_sec=pad_to_sec, 
+        tokenizer=segmentor 
     )
     
     model = CustomWav2Vec2Segmentation(model_checkpoint=model_checkpoint,num_labels=tokenizer.vocab_size)
     
-    training_config = {}
-    
-    group_by_length = False 
-    remove_unused_columns = False
-    
     training_config.update(
         output_dir=output_dir,
-        group_by_length=group_by_length,
-        per_device_train_batch_size=per_device_train_batch_size,
-        per_device_eval_batch_size=per_device_eval_batch_size,
-        seed=seed,
-        evaluation_strategy=evaluation_strategy,
-        save_strategy=save_strategy,
-        logging_strategy=logging_strategy,
-        num_train_epochs=num_train_epochs,
-        fp16=torch.cuda.is_available(),
-        save_steps=save_steps,
-        eval_steps=eval_steps,
-        logging_steps=logging_steps,
-        learning_rate=learning_rate,
-        adam_beta1=adam_beta1,
-        adam_beta2=adam_beta2,
-        adam_epsilon=adam_epsilon,
-        weight_decay=weight_decay,
-        warmup_steps=warmup_steps,
-        save_total_limit=2,
-        push_to_hub=False,
         logging_dir=output_log_dir,
-        remove_unused_columns=remove_unused_columns
-    )
-    
-    training_config.update(
+        group_by_length = False, 
+        remove_unused_columns = False,
         optim="adafactor",
         gradient_checkpointing=False,
-        tf32=torch.cuda.is_available(),
         gradient_accumulation_steps=4,
+        fp16=torch.cuda.is_available(),
+        tf32=torch.cuda.is_available(),
     )
     
 
@@ -402,7 +460,7 @@ if __name__ == "__main__":
     )
 
     
-#     test_dataflow(model,trainset,data_collator)
+    test_dataflow(model,trainset,data_collator)
     
     trainer.train()
     
