@@ -369,6 +369,12 @@ if __name__ == "__main__":
     parser.add_argument("--sampling_rate", type=int, default=16000)
     parser.add_argument("--model_checkpoint", default=None)
     parser.add_argument("--training_config_fp", default=None)
+    
+    parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
+    parser.add_argument("--output_data_dir", type=str, default=os.environ["SM_OUTPUT_DATA_DIR"])
+    parser.add_argument("--training_dir", type=str, default=os.environ["SM_CHANNEL_TRAIN"])
+    parser.add_argument("--test_dir", type=str, default=os.environ["SM_CHANNEL_TEST"])
+    parser.add_argument("--n_gpus", type=str, default=os.environ["SM_NUM_GPUS"])
     args, _ = parser.parse_known_args()
     
     if args.model_checkpoint is not None:
@@ -385,17 +391,18 @@ if __name__ == "__main__":
         training_config = read_json('training_config.json')
         print(f"Using default training configurations")
         
+    PATH = 'data/metadata.csv' ## <-------------------------------------------------- Data
+    repo_name = 'hslau44/common-phone-dev' ## <-------------------------------------------------- Data
+    output_dir = args['output_data_dir'] # 'outputs/exp_01' ## <-------------------------------------------------- Output 
     
-    
-    PATH = 'data/metadata.csv'
-    repo_name = 'hslau44/common-phone-dev'
-    output_dir = 'outputs/exp_01'
     
     # compute config
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.backends.cuda.matmul.allow_tf32 = torch.cuda.is_available()
-    output_mdl_dir = os.path.join(output_dir,'models')
-    output_log_dir = os.path.join(output_dir,'logs')
+    # save_subfolder config
+    output_mdl_dir = args['model-dir'] # os.path.join(output_dir,'models') ## <-------------------------------------------------- Output 
+    output_log_dir = os.path.join(output_dir,'logs') ## <-------------------------------------------------- Output 
+    
     hf_config = AutoConfig.from_pretrained(model_checkpoint)
     tokenizer_type = hf_config.model_type if hf_config.tokenizer_class is None else None
     hf_config = hf_config if hf_config.tokenizer_class is not None else None
@@ -410,11 +417,11 @@ if __name__ == "__main__":
       pad_token=pad_token,
     )
 
-    train_metadata = get_metadata(PATH,'train','en')#.iloc[:12*batch_size,:]
-    valid_metadata = get_metadata(PATH,'dev','en')#.iloc[:2*batch_size,:]
+    train_metadata = get_metadata(PATH,'train','en')#.iloc[:12*batch_size,:] ## <-------------------------------------------------- Data
+    valid_metadata = get_metadata(PATH,'dev','en')#.iloc[:2*batch_size,:] ## <-------------------------------------------------- Data
     
-    trainset  = PhonemeDetailsDataset(train_metadata)
-    validaset = PhonemeDetailsDataset(valid_metadata)
+    trainset  = PhonemeDetailsDataset(train_metadata) ## <-------------------------------------------------- Data
+    validaset = PhonemeDetailsDataset(valid_metadata) ## <-------------------------------------------------- Data
     
     sampling_rate=args.sampling_rate
     resolution=args.resolution
@@ -433,7 +440,7 @@ if __name__ == "__main__":
     model = CustomWav2Vec2Segmentation(model_checkpoint=model_checkpoint,num_labels=tokenizer.vocab_size)
     
     training_config.update(
-        output_dir=output_dir,
+        output_dir=output_mdl_dir,
         logging_dir=output_log_dir,
         group_by_length = False, 
         remove_unused_columns = False,
@@ -456,7 +463,6 @@ if __name__ == "__main__":
         compute_metrics=compute_avg_sample_acc,
         train_dataset=trainset,
         eval_dataset=validaset,
-#         tokenizer=segmentor,
     )
 
     
@@ -467,10 +473,10 @@ if __name__ == "__main__":
     eval_result = trainer.evaluate(eval_dataset=validaset)
 
     print(f"***** Eval results *****")
-    write_json(eval_result,os.path.join(output_log_dir,'eval_result.json'))
+    write_json(eval_result,os.path.join(output_log_dir,'eval_result.json')) ## <-------------------------------------------------- Output 
 
     # Saves the model to s3
-    trainer.save_model(output_mdl_dir)
+    trainer.save_model(output_mdl_dir) ## <-------------------------------------------------- Output 
     
     print("***** Completed *****")
 
