@@ -360,9 +360,17 @@ def test_dataflow(model,dataset,data_collator,batch_size=2):
     return 
 
 
+def load_data_from_s3(fs):
+    return 
+
+
 if __name__ == "__main__":
     
+    # arg 
     parser = argparse.ArgumentParser()
+    train_locales
+    parser.add_argument("--train_locales", default='en')
+    parser.add_argument("--test_locales", default='en')
     parser.add_argument("--resolution", type=float, default=0.02)
     parser.add_argument("--manual_t_end", type=float, default=8.0)
     parser.add_argument("--pad_to_sec", type=float, default=1.0)
@@ -373,7 +381,7 @@ if __name__ == "__main__":
     parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
     parser.add_argument("--output_data_dir", type=str, default=os.environ["SM_OUTPUT_DATA_DIR"])
     parser.add_argument("--training_dir", type=str, default=os.environ["SM_CHANNEL_TRAIN"])
-    parser.add_argument("--test_dir", type=str, default=os.environ["SM_CHANNEL_TEST"])
+    # parser.add_argument("--test_dir", type=str, default=os.environ["SM_CHANNEL_TEST"])
     parser.add_argument("--n_gpus", type=str, default=os.environ["SM_NUM_GPUS"])
     args, _ = parser.parse_known_args()
     
@@ -391,18 +399,38 @@ if __name__ == "__main__":
         training_config = read_json('training_config.json')
         print(f"Using default training configurations")
         
-    PATH = 'data/metadata.csv' ## <-------------------------------------------------- Data
-    repo_name = 'hslau44/common-phone-dev' ## <-------------------------------------------------- Data
-    output_dir = args['output_data_dir'] # 'outputs/exp_01' ## <-------------------------------------------------- Output 
-    
     
     # compute config
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.backends.cuda.matmul.allow_tf32 = torch.cuda.is_available()
     # save_subfolder config
+    output_dir = args['output_data_dir'] # 'outputs/exp_01' ## <-------------------------------------------------- Output 
     output_mdl_dir = args['model-dir'] # os.path.join(output_dir,'models') ## <-------------------------------------------------- Output 
     output_log_dir = os.path.join(output_dir,'logs') ## <-------------------------------------------------- Output 
     
+    
+    # data config
+    load_data_from_s3(args['training_dir'])
+    
+    data_dir = 'data' ## <------------------------------------------------------------------------------------------- Data
+    metadata_dir = os.path.join(data_dir,'metadata.csv')
+    
+    if not os.path.exists(data_dir):
+        raise Exception('Data Directory does not existed ')
+    if not os.path.exists(metadata_dir):
+        raise Exception('Metadata does not existed ')
+    
+    train_locales = args['train_locales']
+    valid_locales = args['test_locales']
+    print(f"language\n training:{train_locales}\ntest:{valid_locales}")
+    # repo_name = 'hslau44/common-phone-dev' ## <-------------------------------------------------- Data
+    
+    train_metadata = get_metadata(metadata_dir,'train',train_locales) #.iloc[:12*batch_size,:] ## <-------------------------------------- Data
+    valid_metadata = get_metadata(metadata_dir,'dev',valid_locales) #.iloc[:2*batch_size,:] ## <----------------------------------------- Data
+    trainset  = PhonemeDetailsDataset(train_metadata,data_dir) ## <-------------------------------------------------- Data
+    validaset = PhonemeDetailsDataset(valid_metadata,data_dir) ## <-------------------------------------------------- Data
+    
+    # model and data-processor config 
     hf_config = AutoConfig.from_pretrained(model_checkpoint)
     tokenizer_type = hf_config.model_type if hf_config.tokenizer_class is None else None
     hf_config = hf_config if hf_config.tokenizer_class is not None else None
@@ -416,12 +444,6 @@ if __name__ == "__main__":
       unk_token=unk_token,
       pad_token=pad_token,
     )
-
-    train_metadata = get_metadata(PATH,'train','en')#.iloc[:12*batch_size,:] ## <-------------------------------------------------- Data
-    valid_metadata = get_metadata(PATH,'dev','en')#.iloc[:2*batch_size,:] ## <-------------------------------------------------- Data
-    
-    trainset  = PhonemeDetailsDataset(train_metadata) ## <-------------------------------------------------- Data
-    validaset = PhonemeDetailsDataset(valid_metadata) ## <-------------------------------------------------- Data
     
     sampling_rate=args.sampling_rate
     resolution=args.resolution
