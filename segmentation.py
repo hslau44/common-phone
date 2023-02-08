@@ -368,7 +368,7 @@ if __name__ == "__main__":
     
     # arg 
     parser = argparse.ArgumentParser()
-    train_locales
+    parser.add_argument("--mode", default='en')
     parser.add_argument("--train_locales", default='en')
     parser.add_argument("--test_locales", default='en')
     parser.add_argument("--resolution", type=float, default=0.02)
@@ -378,10 +378,9 @@ if __name__ == "__main__":
     parser.add_argument("--model_checkpoint", default=None)
     parser.add_argument("--training_config_fp", default=None)
     
-    parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
+    parser.add_argument("--model_dir", type=str, default=os.environ["SM_MODEL_DIR"])
+    parser.add_argument('--datadir', type=str, default=os.environ['SM_CHANNEL_DATADIR'])
     parser.add_argument("--output_data_dir", type=str, default=os.environ["SM_OUTPUT_DATA_DIR"])
-    parser.add_argument("--training_dir", type=str, default=os.environ["SM_CHANNEL_TRAIN"])
-    # parser.add_argument("--test_dir", type=str, default=os.environ["SM_CHANNEL_TEST"])
     parser.add_argument("--n_gpus", type=str, default=os.environ["SM_NUM_GPUS"])
     args, _ = parser.parse_known_args()
     
@@ -404,31 +403,30 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.backends.cuda.matmul.allow_tf32 = torch.cuda.is_available()
     # save_subfolder config
-    output_dir = args['output_data_dir'] # 'outputs/exp_01' ## <-------------------------------------------------- Output 
-    output_mdl_dir = args['model-dir'] # os.path.join(output_dir,'models') ## <-------------------------------------------------- Output 
+    output_dir = args.output_data_dir # 'outputs/exp_01' ## <-------------------------------------------------- Output 
+    output_mdl_dir = args.model_dir # os.path.join(output_dir,'models') ## <-------------------------------------------------- Output 
     output_log_dir = os.path.join(output_dir,'logs') ## <-------------------------------------------------- Output 
     
     
     # data config
-    load_data_from_s3(args['training_dir'])
-    
-    data_dir = 'data' ## <------------------------------------------------------------------------------------------- Data
+    data_dir = args.datadir    ## <------------------------------------------------------------------------------------------- Data
     metadata_dir = os.path.join(data_dir,'metadata.csv')
     
-    if not os.path.exists(data_dir):
-        raise Exception('Data Directory does not existed ')
+    # if not os.path.exists(data_dir):
+    #     raise Exception(f'Data Directory does not existed, current dir: {os.listdir('.')}')
     if not os.path.exists(metadata_dir):
-        raise Exception('Metadata does not existed ')
+        raise Exception(f'Metadata does not existed, datadir: {os.listdir(data_dir)}')
     
-    train_locales = args['train_locales']
-    valid_locales = args['test_locales']
-    print(f"language\n training:{train_locales}\ntest:{valid_locales}")
+    train_locales = args.train_locales
+    valid_locales = args.test_locales
+    print(f"language\n training:{train_locales}\n test:{valid_locales}")
     # repo_name = 'hslau44/common-phone-dev' ## <-------------------------------------------------- Data
     
-    train_metadata = get_metadata(metadata_dir,'train',train_locales) #.iloc[:12*batch_size,:] ## <-------------------------------------- Data
-    valid_metadata = get_metadata(metadata_dir,'dev',valid_locales) #.iloc[:2*batch_size,:] ## <----------------------------------------- Data
+    train_metadata = get_metadata(metadata_dir,'train',train_locales) #.iloc[:12*batch_size,:] ## <------------------ Data
+    valid_metadata = get_metadata(metadata_dir,'dev',valid_locales) #.iloc[:2*batch_size,:] ## <--------------------- Data
     trainset  = PhonemeDetailsDataset(train_metadata,data_dir) ## <-------------------------------------------------- Data
     validaset = PhonemeDetailsDataset(valid_metadata,data_dir) ## <-------------------------------------------------- Data
+    trainset[0]
     
     # model and data-processor config 
     hf_config = AutoConfig.from_pretrained(model_checkpoint)
@@ -487,18 +485,21 @@ if __name__ == "__main__":
         eval_dataset=validaset,
     )
 
-    
-    test_dataflow(model,trainset,data_collator)
-    
-    trainer.train()
-    
-    eval_result = trainer.evaluate(eval_dataset=validaset)
+    if args.mode == "train":
+        
+        trainer.train()
 
-    print(f"***** Eval results *****")
-    write_json(eval_result,os.path.join(output_log_dir,'eval_result.json')) ## <-------------------------------------------------- Output 
+        eval_result = trainer.evaluate(eval_dataset=validaset)
 
-    # Saves the model to s3
-    trainer.save_model(output_mdl_dir) ## <-------------------------------------------------- Output 
+        print(f"***** Eval results *****")
+        write_json(eval_result,os.path.join(output_log_dir,'eval_result.json')) ## <------------- Output 
+
+        # Saves the model to s3
+        trainer.save_model(output_mdl_dir) ## <-------------------------------------------------- Output 
+    
+    else:
+    
+        test_dataflow(model,trainset,data_collator)
     
     print("***** Completed *****")
 
