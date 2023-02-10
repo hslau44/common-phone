@@ -404,7 +404,7 @@ if __name__ == "__main__":
     torch.backends.cuda.matmul.allow_tf32 = torch.cuda.is_available()
     # save_subfolder config
     output_dir = args.output_data_dir # 'outputs/exp_01' ## <-------------------------------------------------- Output 
-    output_mdl_dir = args.model_dir # os.path.join(output_dir,'models') ## <-------------------------------------------------- Output 
+    output_mdl_dir = os.path.join(output_dir,'models') # args.model_dir ## <-------------------------------------------------- Output 
     output_log_dir = os.path.join(output_dir,'logs') ## <-------------------------------------------------- Output 
     
     
