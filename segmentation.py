@@ -357,11 +357,7 @@ def test_dataflow(model,dataset,data_collator,batch_size=2):
         labels = labels.cpu()
     
     print("metric: ",avg_sample_acc(logits,labels))
-    return 
-
-
-def load_data_from_s3(fs):
-    return 
+    return
 
 
 if __name__ == "__main__":
