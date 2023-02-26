@@ -46,14 +46,13 @@ def get_metadata(path,_set=None,_locale=None):
     """
     metadata = pd.read_csv(path)
     if _set is not None:
-        metadata = metadata[(metadata['set'] == _set)]
         if isinstance(_set,list):
             metadata = metadata[(metadata['set'].isin(_set))]
         else:
             metadata = metadata[(metadata['set'] == _set)]
     if _locale is not None:
         if isinstance(_locale,list):
-            metadata = metadata[(metadata['set'].isin(_locale))]
+            metadata = metadata[(metadata['locale'].isin(_locale))]
         else:
             metadata = metadata[(metadata['locale'] == _locale)]
     return metadata
@@ -360,69 +359,45 @@ def test_dataflow(model,dataset,data_collator,batch_size=2):
     return
 
 
-if __name__ == "__main__":
-    
-    # arg 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", default='en')
-    parser.add_argument("--train_locales", default='en')
-    parser.add_argument("--test_locales", default='en')
-    parser.add_argument("--resolution", type=float, default=0.02)
-    parser.add_argument("--manual_t_end", type=float, default=8.0)
-    parser.add_argument("--pad_to_sec", type=float, default=1.0)
-    parser.add_argument("--sampling_rate", type=int, default=16000)
-    parser.add_argument("--model_checkpoint", default=None)
-    parser.add_argument("--training_config_fp", default=None)
-    
-    parser.add_argument("--model_dir", type=str, default=os.environ["SM_MODEL_DIR"])
-    parser.add_argument('--datadir', type=str, default=os.environ['SM_CHANNEL_DATADIR'])
-    parser.add_argument("--output_data_dir", type=str, default=os.environ["SM_OUTPUT_DATA_DIR"])
-    parser.add_argument("--n_gpus", type=str, default=os.environ["SM_NUM_GPUS"])
-    args, _ = parser.parse_known_args()
-    
-    if args.model_checkpoint is not None:
-        model_checkpoint = args.model_checkpoint
-    else: 
-        model_checkpoint = "speech31/wav2vec2-large-english-phoneme-v2"
-    
-    print(f"Using checkpoint: {model_checkpoint}")
-    
-    if args.training_config_fp is not None:
-        training_config = read_json(args.training_config_fp)
-        print(f"Using given training configurations")
-    else:
-        training_config = read_json('training_config.json')
-        print(f"Using default training configurations")
-        
+def train(
+    mode,
+    model_checkpoint,
+    train_locales,
+    test_locales,
+    sampling_rate,
+    resolution,
+    t_end,
+    pad_to_sec,
+    training_config,
+    datadir,
+    output_data_dir,
+    **kwargs
+    ):
     
     # compute config
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.backends.cuda.matmul.allow_tf32 = torch.cuda.is_available()
+    
+    if model_checkpoint is None:
+        model_checkpoint = "speech31/wav2vec2-large-english-phoneme-v2"
+    print(f"Using checkpoint: {model_checkpoint}")
+
     # save_subfolder config
-    output_dir = args.output_data_dir # 'outputs/exp_01' ## <-------------------------------------------------- Output 
-    output_mdl_dir = os.path.join(output_dir,'models') # args.model_dir ## <-------------------------------------------------- Output 
-    output_log_dir = os.path.join(output_dir,'logs') ## <-------------------------------------------------- Output 
-    
-    
+    output_dir = output_data_dir
+    output_mdl_dir = os.path.join(output_dir,'models') 
+    output_log_dir = os.path.join(output_dir,'logs') 
+
     # data config
-    data_dir = args.datadir    ## <------------------------------------------------------------------------------------------- Data
+    data_dir = datadir
     metadata_dir = os.path.join(data_dir,'metadata.csv')
-    
-    # if not os.path.exists(data_dir):
-    #     raise Exception(f'Data Directory does not existed, current dir: {os.listdir('.')}')
     if not os.path.exists(metadata_dir):
         raise Exception(f'Metadata does not existed, datadir: {os.listdir(data_dir)}')
     
-    train_locales = args.train_locales
-    valid_locales = args.test_locales
-    print(f"language\n training:{train_locales}\n test:{valid_locales}")
-    # repo_name = 'hslau44/common-phone-dev' ## <-------------------------------------------------- Data
-    
-    train_metadata = get_metadata(metadata_dir,'train',train_locales) #.iloc[:12*batch_size,:] ## <------------------ Data
-    valid_metadata = get_metadata(metadata_dir,'dev',valid_locales) #.iloc[:2*batch_size,:] ## <--------------------- Data
-    trainset  = PhonemeDetailsDataset(train_metadata,data_dir) ## <-------------------------------------------------- Data
-    validaset = PhonemeDetailsDataset(valid_metadata,data_dir) ## <-------------------------------------------------- Data
-    trainset[0]
+    train_metadata = get_metadata(metadata_dir,'train',train_locales) 
+    valid_metadata = get_metadata(metadata_dir,'dev',test_locales) 
+    trainset  = PhonemeDetailsDataset(train_metadata,data_dir) 
+    validaset = PhonemeDetailsDataset(valid_metadata,data_dir) 
+    print(f"language\n training:{train_locales}   length{len(trainset)}\n test:{test_locales}   length{len(validaset)}")
     
     # model and data-processor config 
     hf_config = AutoConfig.from_pretrained(model_checkpoint)
@@ -438,11 +413,6 @@ if __name__ == "__main__":
       unk_token=unk_token,
       pad_token=pad_token,
     )
-    
-    sampling_rate=args.sampling_rate
-    resolution=args.resolution
-    t_end=args.manual_t_end
-    pad_to_sec=args.pad_to_sec
     
     segmentor = PhonemeSegmentor(tokenizer=tokenizer,resolution=resolution,pad_token=pad_token)
     data_collator = TrainingDataProcessor(
@@ -460,46 +430,67 @@ if __name__ == "__main__":
         logging_dir=output_log_dir,
         group_by_length = False, 
         remove_unused_columns = False,
-        optim="adafactor",
-        gradient_checkpointing=False,
+        optim="adafactor",                        # <-------------------------------------------  check necessity 
+        gradient_checkpointing=False,             # <-------------------------------------------  check necessity 
         gradient_accumulation_steps=4,
         fp16=torch.cuda.is_available(),
         tf32=torch.cuda.is_available(),
     )
-    
 
     training_args = TrainingArguments(**training_config)
-    
-    print("Training runs on: ",training_args.device)
 
     trainer = CustomTrainer(
         model=model,
-        data_collator=data_collator, # data_collator,
+        data_collator=data_collator, 
         args=training_args,
         compute_metrics=compute_avg_sample_acc,
         train_dataset=trainset,
         eval_dataset=validaset,
     )
+    
+    print("Training runs on: ",training_args.device)
 
-    if args.mode == "train":
+    if mode == "train":
         
         trainer.train()
 
         eval_result = trainer.evaluate(eval_dataset=validaset)
 
         print(f"***** Eval results *****")
-        write_json(eval_result,os.path.join(output_log_dir,'eval_result.json')) ## <------------- Output 
+        write_json(eval_result,os.path.join(output_log_dir,'eval_result.json')) 
 
         # Saves the model to s3
-        trainer.save_model(output_mdl_dir) ## <-------------------------------------------------- Output 
+        trainer.save_model(output_mdl_dir) 
     
     else:
     
         test_dataflow(model,trainset,data_collator)
     
     print("***** Completed *****")
+    
+    return
 
 
-
-
-
+if __name__ == "__main__":
+    
+    # arg 
+    config_files = ['segmentation_config.json','training_config.json',]
+    configs = [read_json(c) for c in config_files]
+    
+    parser = argparse.ArgumentParser()
+    
+    for config in configs:
+        add_argument_from_default_config(parser,config)
+    
+    parser.add_argument('--datadir', type=str, default='data')
+    parser.add_argument("--output_data_dir", type=str, default='outputs')
+    
+    args, _ = parser.parse_known_args()
+    
+    args_dic = extract_args_by_default_config(args,configs[0])
+    args_dic['training_config'] = extract_args_by_default_config(args,configs[1])
+    args_dic['output_data_dir'] = args.output_data_dir
+    args_dic['datadir'] = args.datadir
+    
+    print("ARGS:\n",args_dic,"\n")
+    train(**args_dic)

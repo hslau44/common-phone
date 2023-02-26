@@ -1,0 +1,1 @@
+{"mode": "debug", "train_locales": ["en"], "test_locales": ["en"], "model_checkpoint": "speech31/wav2vec2-large-english-phoneme-v2", "resolution": 0.02, "t_end": 8, "pad_to_sec": 1.0, "sampling_rate": 16000}
