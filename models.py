@@ -35,30 +35,48 @@ def layer_truncation(model,keep_num_layers,verbose=1):
     print(f"Keep layer: {idxs}") if verbose else None
     model.layers = nn.ModuleList([model.layers[i] for i in idxs])
 
+    
+class ConvProjectionLayer(nn.Module):
+    
+    def __init__(self,in_features,out_features,kernel_size=1,stride=1,padding=0,actv='gelu'):
+        super(ConvProjectionLayer, self).__init__()
+        self.conv = nn.ConvTranspose1d(in_features,out_features,kernel_size=kernel_size,stride=stride,padding=padding)
+        self.activation = ACTIVATIONS[actv]() if actv is not None else nn.Identity()
+        
+    def forward(self,x):
+        return self.activation(self.conv(x))
+    
 
 class ConvProjection(nn.Module):
     
-    def __init__(self,in_features,out_features,num_layers=1,hid_actv='gelu',resolution=0.02):
+    def __init__(self,in_features,out_features,num_layers=1,hid_actv='gelu',last_actv=None,resolution=0.02):
         super(ConvProjection, self).__init__()
         res_config = {0.02:(2,1),0.01:(4,2),0.005:(8,4)}
         kernel_size,stride = res_config[resolution]
         self.layers = nn.ModuleList()
         for i in range(num_layers-1):
-            self.layers.append(nn.ConvTranspose1d(in_features,in_features,kernel_size=1,stride=1,padding=0))
-            if hid_actv is not None:
-                self.layers.append(ACTIVATIONS[hid_actv]())
-        self.layers.append(nn.ConvTranspose1d(in_features,out_features,kernel_size=kernel_size,stride=stride,padding=0))
+            self.layers.append(ConvProjectionLayer(in_features,in_features,kernel_size=1,stride=1,padding=0,actv=hid_actv))
+        self.layers.append(ConvProjectionLayer(in_features,out_features,kernel_size=kernel_size,stride=stride,padding=0,actv=None))
+        self.activation = ACTIVATIONS[last_actv]() if last_actv is not None else nn.Identity()
     
     def forward(self,x):
         x = x.permute(0,2,1)
         for layer in self.layers:
             x = layer(x)
-        return x.permute(0,2,1)
+        return self.activation(x.permute(0,2,1))
     
 
 class CustomWav2Vec2Segmentation(nn.Module):
     
-    def __init__(self,model_checkpoint,num_labels,num_encoders=None,num_convprojs=1,conv_hid_actv='gelu',sr=16000,resolution=0.02,verbose=0):
+    def __init__(self,model_checkpoint,num_labels,
+                 num_encoders=None,
+                 num_convprojs=1,
+                 conv_hid_actv='gelu',
+                 conv_last_actv=None,
+                 sr=16000,
+                 resolution=0.02,
+                 verbose=0
+                ):
         super(CustomWav2Vec2Segmentation, self).__init__()
         self.sr = sr
         self.model = Wav2Vec2ForAudioFrameClassification.from_pretrained(model_checkpoint,num_labels=num_labels)
@@ -73,6 +91,7 @@ class CustomWav2Vec2Segmentation(nn.Module):
             out_features=num_labels,
             num_layers=num_convprojs,
             hid_actv=conv_hid_actv,
+            last_actv=conv_last_actv,
             resolution=resolution
         )
     
