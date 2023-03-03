@@ -7,6 +7,8 @@ from transformers import Wav2Vec2ForAudioFrameClassification
 ACTIVATIONS = {
     'gelu':nn.GELU,
     'relu':nn.ReLU,
+    'none':nn.Identity,
+    'None':nn.Identity,
 }
 
 

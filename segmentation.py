@@ -8,6 +8,7 @@ from tqdm import tqdm
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
+import transformers
 from transformers import (
     AutoConfig,
     AutoTokenizer,
@@ -380,6 +381,7 @@ def train(
     ):
     
     # compute config
+    transformers.utils.logging.set_verbosity_error()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.backends.cuda.matmul.allow_tf32 = torch.cuda.is_available()
     
@@ -428,10 +430,10 @@ def train(
         tokenizer=segmentor 
     )
 
-    num_encoders = 3
-    num_convprojs = 2
-    conv_hid_actv = 'gelu'
-    conv_last_actv = None
+#     num_encoders = 3
+#     num_convprojs = 2
+#     conv_hid_actv = 'gelu'
+#     conv_last_actv = None
 
     model = CustomWav2Vec2Segmentation(
         model_checkpoint,
