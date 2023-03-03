@@ -20,7 +20,8 @@ from transformers import (
 from datasets import load_dataset
 import evaluate
 from sklearn import metrics
-from utils import write_json, read_json
+from utils import *
+from models import CustomWav2Vec2Segmentation
 
 
 def get_metadata(path,_set=None,_locale=None):
@@ -259,35 +260,35 @@ class TrainingDataProcessor:
 
 
 # model
-class ConvProjection(nn.Module):
+# class ConvProjection(nn.Module):
     
-    def __init__(self,in_features,out_features):
-        super(ConvProjection, self).__init__()
-        kernel_size=2 # 4
-        stride=1 # 2
-        self.layer = nn.ConvTranspose1d(in_features,out_features,kernel_size=kernel_size,stride=stride,padding=0)
+#     def __init__(self,in_features,out_features):
+#         super(ConvProjection, self).__init__()
+#         kernel_size=2 # 4
+#         stride=1 # 2
+#         self.layer = nn.ConvTranspose1d(in_features,out_features,kernel_size=kernel_size,stride=stride,padding=0)
     
-    def forward(self,x):
-        x = x.permute(0,2,1)
-        return self.layer(x).permute(0,2,1)
+#     def forward(self,x):
+#         x = x.permute(0,2,1)
+#         return self.layer(x).permute(0,2,1)
     
     
-class CustomWav2Vec2Segmentation(nn.Module):
+# class CustomWav2Vec2Segmentation(nn.Module):
     
-    def __init__(self,model_checkpoint,num_labels,sr=16000):
-        super(CustomWav2Vec2Segmentation, self).__init__()
-        self.sr = sr
-        self.model = Wav2Vec2ForAudioFrameClassification.from_pretrained(model_checkpoint,num_labels=num_labels)
-        self.model.classifier = ConvProjection(self.model.classifier.in_features,num_labels)
+#     def __init__(self,model_checkpoint,num_labels,sr=16000):
+#         super(CustomWav2Vec2Segmentation, self).__init__()
+#         self.sr = sr
+#         self.model = Wav2Vec2ForAudioFrameClassification.from_pretrained(model_checkpoint,num_labels=num_labels)
+#         self.model.classifier = ConvProjection(self.model.classifier.in_features,num_labels)
         
     
-    def forward(self,input_values,labels):
-        x = input_values
-        bs = x.shape[0]
-        x = x.view(-1,self.sr)
-        x = self.model(x)
-        x.logits = x.logits.reshape(bs,-1,x.logits.shape[-1])
-        return x
+#     def forward(self,input_values,labels):
+#         x = input_values
+#         bs = x.shape[0]
+#         x = x.view(-1,self.sr)
+#         x = self.model(x)
+#         x.logits = x.logits.reshape(bs,-1,x.logits.shape[-1])
+#         return x
 
 
 # loss    
@@ -371,6 +372,10 @@ def train(
     training_config,
     datadir,
     output_data_dir,
+    num_encoders,
+    num_convprojs,
+    conv_hid_actv,
+    conv_last_actv,
     **kwargs
     ):
     
@@ -422,8 +427,21 @@ def train(
         pad_to_sec=pad_to_sec, 
         tokenizer=segmentor 
     )
-    
-    model = CustomWav2Vec2Segmentation(model_checkpoint=model_checkpoint,num_labels=tokenizer.vocab_size)
+
+    num_encoders = 3
+    num_convprojs = 2
+    conv_hid_actv = 'gelu'
+    conv_last_actv = None
+
+    model = CustomWav2Vec2Segmentation(
+        model_checkpoint,
+        num_labels=tokenizer.vocab_size,
+        num_encoders=num_encoders,
+        num_convprojs=num_convprojs,
+        conv_hid_actv=conv_hid_actv,
+        conv_last_actv=conv_last_actv,
+        resolution=resolution
+    )
     
     training_config.update(
         output_dir=output_mdl_dir,
