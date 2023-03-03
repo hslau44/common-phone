@@ -4,6 +4,12 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import Wav2Vec2ForAudioFrameClassification
 
 
+ACTIVATIONS = {
+    'gelu':nn.GELU,
+    'relu':nn.ReLU,
+}
+
+
 def truncate_arr_from_centre(arr,keep=None):
     a,b = [],[]
     i = -1
@@ -32,13 +38,15 @@ def layer_truncation(model,keep_num_layers,verbose=1):
 
 class ConvProjection(nn.Module):
     
-    def __init__(self,in_features,out_features,num_layers=1,resolution=0.02):
+    def __init__(self,in_features,out_features,num_layers=1,hid_actv='gelu',resolution=0.02):
         super(ConvProjection, self).__init__()
         res_config = {0.02:(2,1),0.01:(4,2),0.005:(8,4)}
         kernel_size,stride = res_config[resolution]
         self.layers = nn.ModuleList()
         for i in range(num_layers-1):
             self.layers.append(nn.ConvTranspose1d(in_features,in_features,kernel_size=1,stride=1,padding=0))
+            if hid_actv is not None:
+                self.layers.append(ACTIVATIONS[hid_actv]())
         self.layers.append(nn.ConvTranspose1d(in_features,out_features,kernel_size=kernel_size,stride=stride,padding=0))
     
     def forward(self,x):
@@ -50,7 +58,7 @@ class ConvProjection(nn.Module):
 
 class CustomWav2Vec2Segmentation(nn.Module):
     
-    def __init__(self,model_checkpoint,num_labels,num_encoders=None,num_convprojs=1,sr=16000,resolution=0.02,verbose=0):
+    def __init__(self,model_checkpoint,num_labels,num_encoders=None,num_convprojs=1,conv_hid_actv='gelu',sr=16000,resolution=0.02,verbose=0):
         super(CustomWav2Vec2Segmentation, self).__init__()
         self.sr = sr
         self.model = Wav2Vec2ForAudioFrameClassification.from_pretrained(model_checkpoint,num_labels=num_labels)
@@ -64,6 +72,7 @@ class CustomWav2Vec2Segmentation(nn.Module):
             in_features=self.model.classifier.in_features,
             out_features=num_labels,
             num_layers=num_convprojs,
+            hid_actv=conv_hid_actv,
             resolution=resolution
         )
     
