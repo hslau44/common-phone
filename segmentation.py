@@ -260,38 +260,6 @@ class TrainingDataProcessor:
         return {"input_values":audio_inputs,"labels":labels}
 
 
-# model
-# class ConvProjection(nn.Module):
-    
-#     def __init__(self,in_features,out_features):
-#         super(ConvProjection, self).__init__()
-#         kernel_size=2 # 4
-#         stride=1 # 2
-#         self.layer = nn.ConvTranspose1d(in_features,out_features,kernel_size=kernel_size,stride=stride,padding=0)
-    
-#     def forward(self,x):
-#         x = x.permute(0,2,1)
-#         return self.layer(x).permute(0,2,1)
-    
-    
-# class CustomWav2Vec2Segmentation(nn.Module):
-    
-#     def __init__(self,model_checkpoint,num_labels,sr=16000):
-#         super(CustomWav2Vec2Segmentation, self).__init__()
-#         self.sr = sr
-#         self.model = Wav2Vec2ForAudioFrameClassification.from_pretrained(model_checkpoint,num_labels=num_labels)
-#         self.model.classifier = ConvProjection(self.model.classifier.in_features,num_labels)
-        
-    
-#     def forward(self,input_values,labels):
-#         x = input_values
-#         bs = x.shape[0]
-#         x = x.view(-1,self.sr)
-#         x = self.model(x)
-#         x.logits = x.logits.reshape(bs,-1,x.logits.shape[-1])
-#         return x
-
-
 # loss    
 def nll_loss(logits,labels):
     logits = logits.reshape(-1,logits.shape[-1])
@@ -404,7 +372,7 @@ def train(
     valid_metadata = get_metadata(metadata_dir,'dev',test_locales) 
     trainset  = PhonemeDetailsDataset(train_metadata,data_dir) 
     validaset = PhonemeDetailsDataset(valid_metadata,data_dir) 
-    print(f"language\n training:{train_locales}   length{len(trainset)}\n test:{test_locales}   length{len(validaset)}")
+    print(f"language\n training:{train_locales}   length: {len(trainset)}\n test:{test_locales}   length: {len(validaset)}")
     
     # model and data-processor config 
     hf_config = AutoConfig.from_pretrained(model_checkpoint)
