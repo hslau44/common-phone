@@ -413,6 +413,9 @@ def train(
         resolution=resolution
     )
     
+    if kwargs.get('freeze_encoder'):
+        model.change_grad_state('encoder',range(30),False)
+    
     training_config.update(
         output_dir=output_mdl_dir,
         logging_dir=output_log_dir,
