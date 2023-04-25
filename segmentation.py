@@ -23,6 +23,8 @@ import evaluate
 from sklearn import metrics
 from utils import *
 from models import CustomWav2Vec2Segmentation
+from data_utils import BatchProcessor
+from evaluation import Evaluator
 
 
 def get_metadata(path,_set=None,_locale=None):
@@ -198,7 +200,7 @@ class PhonemeDetailsDataset(Dataset):
         example = {"input_values":audio_input,"labels":label}
         return example
 
-    
+
 # Data processor/collator    
 class TrainingDataProcessor:
     
