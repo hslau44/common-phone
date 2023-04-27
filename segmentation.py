@@ -398,11 +398,6 @@ def train(
         tokenizer=segmentor 
     )
 
-#     num_encoders = 3
-#     num_convprojs = 2
-#     conv_hid_actv = 'gelu'
-#     conv_last_actv = None
-
     model = CustomWav2Vec2Segmentation(
         model_checkpoint,
         num_labels=tokenizer.vocab_size,
@@ -443,6 +438,9 @@ def train(
 
     if mode == "train":
         
+        print(f"Mode '{mode}'")
+        print("***** Training start *****")
+        
         trainer.train()
 
         eval_result = trainer.evaluate(eval_dataset=validaset)
@@ -453,9 +451,15 @@ def train(
         # Saves the model to s3
         trainer.save_model(output_mdl_dir) 
     
-    else:
+    elif mode == "debug":
+        
+        print(f"Mode '{mode}'")
     
         test_dataflow(model,trainset,data_collator)
+        
+    else:
+        
+        print(f"Mode {mode} not recognised, no process proceed")
     
     print("***** Completed *****")
     
