@@ -29,12 +29,12 @@ class BatchProcessor(BaseProcessor):
         return inputs
     
     def from_batch(self,inputs):
-        length = list(inputs.keys())[0]
+        length = len(inputs[list(inputs.keys())[0]])
         rows = []
         for i in range(length):
             row = {}
             for key in inputs.keys():
-                row[key] = outputs[key][i]
+                row[key] = inputs[key][i]
             rows.append(row)
         return rows
 
