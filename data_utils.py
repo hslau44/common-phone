@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from transformers import AutoConfig, AutoTokenizer
+from segmentation import PhonemeSegmentor
 
 
 class BaseProcessor(object):

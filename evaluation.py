@@ -1,4 +1,6 @@
+import os
 from sklearn import metrics
+from segmentation import get_metadata, PhonemeDetailsDataset
 
 class Evaluator(object):
 
@@ -16,7 +18,7 @@ class CommonPhoneSegmentationEvaluator(Evaluator):
         metadata_fp = os.path.join(data_dir,"metadata.csv")
         metadata = get_metadata(path=metadata_fp,_locale=test_locales,_set='test')
         self.dataset = PhonemeDetailsDataset(metadata,data_dir=data_dir)
-        super().__init__(config=config)
+        super().__init__(config=kwargs)
     
     def evaluate(self,model) -> dict:
         sample_acc = 0
