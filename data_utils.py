@@ -128,3 +128,28 @@ class PhonemeDetailProcessor(BatchProcessor):
         arr = np.argmax(arr,-1)
         labels = self.segmentor.decode(arr)
         return labels
+
+
+class TrainingDataProcessor(BaseProcessor):
+    
+    def __init__(self,model_checkpoint,sampling_rate,resolution,t_end,rtn_type='pt',**kwargs):
+        self.arr_processor = AudioArrayProcessor(
+            t_end=t_end,
+            sampling_rate=sampling_rate,
+            rtn_type=rtn_type
+        )
+        self.label_processor = PhonemeDetailProcessor(
+            model_checkpoint=model_checkpoint,
+            resolution=resolution,
+            t_end=t_end,
+            rtn_type=rtn_type
+        )
+        
+    def transform(self,inputs):
+        batch = {}
+        batch.update(self.arr_processor.transform(inputs))
+        batch.update(self.label_processor.transform(inputs))
+        return batch
+    
+    def __call__(self,inputs):
+        return self.transform(inputs)
