@@ -77,7 +77,8 @@ class CustomWav2Vec2Segmentation(nn.Module):
                  conv_last_actv=None,
                  sr=16000,
                  resolution=0.02,
-                 verbose=0
+                 verbose=0,
+                 **kwargs
                 ):
         super(CustomWav2Vec2Segmentation, self).__init__()
         self.sr = sr
