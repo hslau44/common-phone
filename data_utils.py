@@ -108,3 +108,23 @@ class PhonemeDetailProcessor(BatchProcessor):
     
     def to_batch(self,inputs):
         return super().to_batch(inputs).long()
+    
+    def inverse_transform(self,inputs):
+        outputs = self.from_batch(inputs)
+        for i in range(len(outputs)):
+            row = outputs[i]
+            row = self.process_row(row)
+            outputs[i] = row
+        return outputs
+    
+    def process_row(self,row):
+        logits = row['logits']
+        row['labels'] = self.process_logits(logits)
+        row.pop('logits')
+        return row
+    
+    def process_logits(self,logits):
+        arr = logits.detach().numpy()
+        arr = np.argmax(arr,-1)
+        labels = self.segmentor.decode(arr)
+        return labels
