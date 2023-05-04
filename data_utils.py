@@ -1,7 +1,10 @@
+import os
+import soundfile as sf
 import numpy as np
 import torch
+from torch.utils.data import Dataset, DataLoader
 from transformers import AutoConfig, AutoTokenizer
-from segmentation import PhonemeSegmentor
+from segmentation import PhonemeSegmentor, get_metadata
 
 
 class BaseProcessor(object):
@@ -153,3 +156,49 @@ class TrainingDataProcessor(BaseProcessor):
     
     def __call__(self,inputs):
         return self.transform(inputs)
+
+
+# Data generator
+class PhonemeDetailsDataset(Dataset):
+    
+    def __init__(self,metadata,data_dir='data'):
+        self.metadata = metadata
+        self.data_dir = data_dir
+    
+    def __len__(self):
+        return len(self.metadata)
+    
+    def __getitem__(self,idx):
+        row = self.metadata.iloc[idx,:]
+        # audio input
+        fpath = os.path.join(self.data_dir,row['file_name'])
+        audio_input,sr = sf.read(fpath)
+        # label
+        label = row['phonetic_detail']
+        # inputs
+        example = {"input_values":audio_input,"labels":label}
+        return example
+
+
+class SegmentationDataLoader(DataLoader):
+    
+    def __init__(self,data_dir,model_checkpoint,sampling_rate,resolution,t_end,_set,**kwargs):
+        metadata_fp = os.path.join(data_dir,"metadata.csv")
+        _locale = None
+        if _set == 'test':
+            _locale = kwargs.get('test_locales')
+        else:
+            _locale = kwargs.get('train_locales')
+        metadata = get_metadata(path=metadata_fp,_locale=_locale,_set=_set)
+        dataset = PhonemeDetailsDataset(metadata,data_dir=data_dir)
+        collate_fn = TrainingDataProcessor(
+            model_checkpoint=model_checkpoint,
+            sampling_rate=sampling_rate,
+            resolution=resolution,
+            t_end=t_end,
+            rtn_type='pt',
+        )
+        batch_size = kwargs.get('batch_size',1)
+        shuffle = kwargs.get('shuffle',None)
+        num_workers = kwargs.get('num_workers',0)
+        super().__init__(dataset=dataset,collate_fn=collate_fn,batch_size=batch_size,shuffle=shuffle,num_workers=num_workers)
