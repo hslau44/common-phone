@@ -6,3 +6,6 @@ praatio
 transformers
 datasets
 evaluate
+ray[tune]
+lightning
+lightning-bolts
