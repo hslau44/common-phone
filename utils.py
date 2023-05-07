@@ -30,13 +30,18 @@ def extract_args_by_default_config(args,default_config):
             config[k] = v
     return config
 
-def add_argument_from_default_config(parser,default_config):
+
+def add_argument_from_default_config(parser,default_config, add_as_default=None):
     for k,v in default_config.items():
+        default_value = None
+        if add_as_default:
+            default_value = v
         if isinstance(v,list):
-            parser.add_argument(f"--{k}", nargs='+', type=type(v[0]), default=v)
+            parser.add_argument(f"--{k}", nargs='+', type=type(v[0]), default=default_value)
         else:
-            parser.add_argument(f"--{k}", type=type(v), default=v)
+            parser.add_argument(f"--{k}", type=type(v), default=default_value)
         
+
 def set_argparser_by_default_configs(*config_files):
     configs = [read_json(config_file) for config_file in config_files]
     parser = argparse.ArgumentParser()
