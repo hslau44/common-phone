@@ -79,8 +79,7 @@ class CustomWav2Vec2Segmentation(nn.Module):
                  conv_last_actv=None,
                  sr=16000,
                  resolution=0.02,
-                 verbose=0,
-                 freeze_encoder=False
+                 freeze_encoder=False,
                  **kwargs,
                 ):
         super(CustomWav2Vec2Segmentation, self).__init__()
@@ -90,7 +89,7 @@ class CustomWav2Vec2Segmentation(nn.Module):
             layer_truncation(
                 model=self.model.wav2vec2.encoder,
                 keep_num_layers=num_encoders,
-                verbose=verbose,
+                verbose=0,
             )
         self.model.classifier = ConvProjection(
             in_features=self.model.classifier.in_features,
