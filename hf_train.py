@@ -234,7 +234,7 @@ class TrainingDataProcessor_(TrainingDataProcessor):
 
 class Objective_class(object):
     
-    def __init__(self,**local_args):
+    def __init__(self, local_args):
         self.local_args = local_args
     
     def __call__(self,trial):
@@ -301,7 +301,7 @@ def hyperparameter_optimization(args):
     from function 'hp_space', which means they will no longer
     be tunable
     """
-    optuna_objective = Objective_class(**args)
+    optuna_objective = Objective_class(args)
     study = optuna.create_study(direction='maximize')
     study.optimize(optuna_objective, n_trials=args['n_trials'])
     study_fp = os.path.join(args['output_data_dir'],'study.pkl')
