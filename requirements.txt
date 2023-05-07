@@ -6,3 +6,5 @@ praatio
 transformers
 datasets
 evaluate
+optuna
+tensorboard
