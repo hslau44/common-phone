@@ -21,14 +21,14 @@ from segmentation import (
     compute_avg_sample_acc,
 )
 from models import CustomWav2Vec2Segmentation
-from utils import read_json
+from utils import read_json, get_default_arg
 
 
 # compute config
 transformers.utils.logging.set_verbosity_error()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.backends.cuda.matmul.allow_tf32 = torch.cuda.is_available()
-#args to be feed to TrainingArguments
+# args to be feed to TrainingArguments
 ACCEPT_TRAINARGS = [
     'seed',
     'num_train_epochs',
@@ -235,6 +235,7 @@ class TrainingDataProcessor_(TrainingDataProcessor):
 class Objective_class(object):
     
     def __init__(self, local_args):
+        self.default_args = get_default_arg()
         self.local_args = local_args
     
     def __call__(self,trial):
@@ -243,7 +244,8 @@ class Objective_class(object):
         return score 
     
     def set_hp_space(self,trial):
-        args = hp_space(trial)
+        args = copy.deepcopy(self.default_args)
+        args.update(hp_space(trial))
         args.update(self.local_args)
         args = self.exp_code_ops(args)
         return args
@@ -338,18 +340,11 @@ def hyperparameter_optimization_with_trainer_api(args):
         hp_space=helper.hp_space,
         n_trials=args['n_trials'],
     )
-    return 
-
+    return
 
 
 if __name__ == "__main__":
-    
-    
-    args = {}
-    
-    for c in ['training_config.json','segmentation_config.json']:
-        args.update(read_json(c))    
-    
+    args = get_default_arg()
     # local setting
     args['mode'] = 'debug'
     args['datadir'] = 'data'
