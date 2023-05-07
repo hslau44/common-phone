@@ -65,38 +65,14 @@ ACCEPT_TRAINARGS = [
 def hp_space(trial):
 
     args = {
-        'seed': 42,
-        'num_train_epochs': 1,
         'per_device_train_batch_size': trial.suggest_categorical("per_device_train_batch_size", [2, 4, 8]),
-         'per_device_eval_batch_size': 1,
-        'evaluation_strategy': 'epoch',
-        'save_strategy': 'epoch',
-        'logging_strategy': 'steps',
-        'save_steps': 10,
-        'eval_steps': 10,
-        'logging_steps': 10,
         'learning_rate': trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
-        'adam_beta1': 0.9,
-        'adam_beta2': 0.999,
-        'adam_epsilon': 1e-08,
         'weight_decay': trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True),
-        'lr_scheduler_type': 'linear',
         'warmup_steps': trial.suggest_float("warmup_steps", 1, 1000, log=True),
         'optim': trial.suggest_categorical("optim", ["adafactor", "adamw_torch"]),
-        'gradient_checkpointing': False,
-        'gradient_accumulation_steps': 4,
-        'fp16': torch.cuda.is_available(),
-        'tf32': True, # torch.cuda.is_available(),
-        'group_by_length': False,
-        'remove_unused_columns': False,
-        'save_total_limit': 2,
-        'push_to_hub': False,
     }
 
     args.update({
-        'train_locales': ['en'],
-        'test_locales': ['en'],
-        'sampling_rate': 16000,
         'resolution': trial.suggest_categorical("resolution", [0.005, 0.01, 0.02]),
         't_end': 8,
         'pad_to_sec': 1,
@@ -105,7 +81,6 @@ def hp_space(trial):
         'conv_hid_actv': trial.suggest_categorical("conv_hid_actv", ["gelu", "relu","none"]),
         'conv_last_actv': None,
         'freeze_encoder': True,
-        'model_checkpoint': "speech31/wav2vec2-large-english-phoneme-v2",
     })
     
     
