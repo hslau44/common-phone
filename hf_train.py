@@ -1,4 +1,5 @@
 import os
+import copy
 import datetime
 import joblib
 import optuna
@@ -253,6 +254,45 @@ class Objective_class(object):
         args['output_data_dir'] = os.path.join(output_dir,exp_code)
         return args
 
+
+class HyperOptHelper:
+    
+    def __init__(self,local_args):
+        self.local_args = local_args
+        
+    def hp_space(self,trial):
+        
+        args = copy.deepcopy(self.local_args)
+        
+        args.update({
+            'learning_rate': trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
+            'adam_beta1': 0.9,
+            'adam_beta2': 0.999,
+            'adam_epsilon': 1e-08,
+            'weight_decay': trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True),
+            'lr_scheduler_type': 'linear',
+            'warmup_steps': trial.suggest_float("warmup_steps", 1, 1000, log=True),
+            'optim': trial.suggest_categorical("optim", ["adafactor", "adamw_torch"]),
+        })
+        
+        return args
+    
+    def model_init(self,trial):
+        
+        args = copy.deepcopy(self.local_args)
+        
+        args.update({
+            'resolution': trial.suggest_categorical("resolution", [0.005, 0.01, 0.02]),
+            'num_encoders': trial.suggest_int("num_encoders", 5, 12),  
+            'num_convprojs': trial.suggest_int("num_convprojs", 1, 5),
+            'conv_hid_actv': trial.suggest_categorical("conv_hid_actv", ["gelu", "relu","none"]),
+            'freeze_encoder': True
+        })
+        
+        model = CustomWav2Vec2Segmentation(**args)
+        
+        return model
+
     
 def hyperparameter_optimization(args):
     """
@@ -263,16 +303,54 @@ def hyperparameter_optimization(args):
     """
     optuna_objective = Objective_class(**args)
     study = optuna.create_study(direction='maximize')
-    study.optimize(optuna_objective, n_trials=30)
+    study.optimize(optuna_objective, n_trials=args['n_trials'])
     study_fp = os.path.join(args['output_data_dir'],'study.pkl')
     joblib.dump(study, study_fp)
     return
 
 
+def hyperparameter_optimization_with_trainer_api(args):
+    
+    trainset = PhonemeDetailsDataset_(_set='train',**args)
+    validaset = PhonemeDetailsDataset_(_set='dev',**args)
+    data_collator = TrainingDataProcessor_(**args)
+    
+    helper = HyperOptHelper(args)
+    training_args = TrainingArguments(**set_training_arguments(args))
+    callbacks = callbacks = get_callbacks(args)
+    
+    trainer = CustomTrainer(
+        model_init=helper.model_init,
+        data_collator=data_collator, 
+        args=training_args,
+        compute_metrics=compute_avg_sample_acc, # import
+        train_dataset=trainset,
+        eval_dataset=validaset,
+        callbacks=callbacks,
+    )
+    
+    # as CustomTrainer is used, (aggregated) metric, i.e. avg_sample_acc is used, 
+    # thus direction="maximize"
+    
+    best_trial = trainer.hyperparameter_search(
+        direction="maximize",
+        backend="optuna",
+        hp_space=helper.hp_space,
+        n_trials=args['n_trials'],
+    )
+    return 
+
+
+
 if __name__ == "__main__":
     
-    # local setting
+    
     args = {}
+    
+    for c in ['training_config.json','segmentation_config.json']:
+        args.update(read_json(c))    
+    
+    # local setting
     args['mode'] = 'debug'
     args['datadir'] = 'data'
     args['output_data_dir'] = 'outputs/exp_04'
@@ -280,7 +358,9 @@ if __name__ == "__main__":
     args['per_device_train_batch_size'] = 2
     args['per_device_eval_batch_size'] = 2
     args['num_train_epochs'] = 5
+    args['n_trials'] = 10
     
-    hyperparameter_optimization(args)
+    # hyperparameter_optimization(args)
+    hyperparameter_optimization_with_trainer_api(args)
     
     
