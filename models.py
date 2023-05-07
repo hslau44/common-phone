@@ -70,14 +70,17 @@ class ConvProjection(nn.Module):
 
 class CustomWav2Vec2Segmentation(nn.Module):
     
-    def __init__(self,model_checkpoint,num_labels,
+    def __init__(self,
+                 model_checkpoint,
+                 num_labels,
                  num_encoders=None,
                  num_convprojs=1,
                  conv_hid_actv='gelu',
                  conv_last_actv=None,
                  sr=16000,
                  resolution=0.02,
-                 verbose=0
+                 verbose=0,
+                 **kwargs,
                 ):
         super(CustomWav2Vec2Segmentation, self).__init__()
         self.sr = sr
