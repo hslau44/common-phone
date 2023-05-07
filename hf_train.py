@@ -319,18 +319,16 @@ def hyperparameter_optimization_with_trainer_api(args):
 
 
 if __name__ == "__main__":
-    args = get_default_arg()
     # local setting
-    args['mode'] = 'debug'
+    args['mode'] = 'train'
     args['datadir'] = 'data'
-    args['output_data_dir'] = 'outputs/exp_04'
+    args['output_data_dir'] = 'outputs/exp_05'
     args['tf32'] = False
     args['per_device_train_batch_size'] = 2
     args['per_device_eval_batch_size'] = 2
-    args['num_train_epochs'] = 5
-    args['n_trials'] = 10
+    args['num_train_epochs'] = 40
+    args['n_trials'] = 16
     
-    # hyperparameter_optimization(args)
-    hyperparameter_optimization_with_trainer_api(args)
+    hyperparameter_optimization(args)
     
     
