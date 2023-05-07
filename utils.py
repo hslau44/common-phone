@@ -1,6 +1,11 @@
 import argparse
 import json
 
+ARGS_FILEPATHS = [
+    'training_config.json',
+    'segmentation_config.json',
+]
+
 
 def write_json(items,fp):
     with open(fp, 'w') as file:
@@ -10,6 +15,13 @@ def read_json(fp):
     with open(fp,'r') as file:
         data = json.load(file)
     return data
+
+
+def get_default_arg(filepaths=ARGS_FILEPATHS):
+    args = {}
+    for fp in filepaths:
+        args.update(read_json(fp))
+    return args
 
 def extract_args_by_default_config(args,default_config):
     config = {}
@@ -31,5 +43,3 @@ def set_argparser_by_default_configs(*config_files):
     for config in configs:
         add_argument_from_default_config(parser,config)
     return parser
-    
-    
