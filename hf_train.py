@@ -1,4 +1,5 @@
 import os
+import datetime
 import joblib
 import optuna
 import transformers, torch
@@ -139,6 +140,12 @@ def set_training_arguments(args):
     return training_args
 
 
+def get_datetime():
+    k = datetime.datetime.now()
+    t = str(k.date()) + str('_') + str(k.hour) + str('-') + str(k.minute)
+    return t
+
+
 def get_callbacks(args):
     patient = args.get('early_stopping_patience',1)
     threshold = args.get('early_stopping_threshold',0.0)
@@ -181,7 +188,7 @@ def objective(args):
 
 class PhonemeDetailsDataset_(PhonemeDetailsDataset):
     
-    def __init__(self,_set,**kwargs):
+    def __init__(self,_set,mode,**kwargs):
         data_dir = kwargs['datadir'] # <------- find correct arg name
         path = os.path.join(data_dir,'metadata.csv')
         if _set == 'test':
@@ -189,6 +196,9 @@ class PhonemeDetailsDataset_(PhonemeDetailsDataset):
         else:
             _locale = kwargs['train_locales']
         metadata = get_metadata(path=path,_set=_set,_locale=_locale)
+        if mode == 'debug':
+            metadata = metadata.copy().iloc[:64,:]
+            metadata.reset_index(drop=True, inplace=True)
         super().__init__(metadata,data_dir)
 
 
@@ -234,6 +244,13 @@ class Objective_class(object):
     def set_hp_space(self,trial):
         args = hp_space(trial)
         args.update(self.local_args)
+        args = self.exp_code_ops(args)
+        return args
+    
+    def exp_code_ops(self,args):
+        output_dir = args['output_data_dir']
+        exp_code = get_datetime()
+        args['output_data_dir'] = os.path.join(output_dir,exp_code)
         return args
 
     
@@ -246,7 +263,7 @@ def hyperparameter_optimization(args):
     """
     optuna_objective = Objective_class(**args)
     study = optuna.create_study(direction='maximize')
-    study.optimize(optuna_objective, n_trials=2)
+    study.optimize(optuna_objective, n_trials=30)
     study_fp = os.path.join(args['output_data_dir'],'study.pkl')
     joblib.dump(study, study_fp)
     return
@@ -256,11 +273,13 @@ if __name__ == "__main__":
     
     # local setting
     args = {}
+    args['mode'] = 'debug'
     args['datadir'] = 'data'
     args['output_data_dir'] = 'outputs/exp_04'
     args['tf32'] = False
     args['per_device_train_batch_size'] = 2
     args['per_device_eval_batch_size'] = 2
+    args['num_train_epochs'] = 5
     
     hyperparameter_optimization(args)
     
