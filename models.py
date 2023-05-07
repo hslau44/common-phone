@@ -80,6 +80,7 @@ class CustomWav2Vec2Segmentation(nn.Module):
                  sr=16000,
                  resolution=0.02,
                  verbose=0,
+                 freeze_encoder=False
                  **kwargs,
                 ):
         super(CustomWav2Vec2Segmentation, self).__init__()
@@ -99,6 +100,8 @@ class CustomWav2Vec2Segmentation(nn.Module):
             last_actv=conv_last_actv,
             resolution=resolution
         )
+        if freeze_encoder:
+            self.change_grad_state('encoder',range(30),False)
     
     def forward(self,input_values,labels):
         x = input_values
