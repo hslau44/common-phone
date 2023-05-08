@@ -263,7 +263,7 @@ class HyperOptHelper:
         args = copy.deepcopy(self.default_args)
         args.update({
             'resolution': trial.suggest_categorical("resolution", [0.005, 0.01, 0.02]),
-            'num_encoders': None # trial.suggest_int("num_encoders", 5, 12),  
+            'num_encoders': None, # trial.suggest_int("num_encoders", 5, 12),  
             'num_convprojs': trial.suggest_int("num_convprojs", 1, 5),
             'conv_hid_actv': trial.suggest_categorical("conv_hid_actv", ["gelu", "relu","none"]),
             'freeze_encoder': True
