@@ -241,40 +241,41 @@ class Objective_class(object):
 class HyperOptHelper:
     
     def __init__(self,local_args):
+        self.default_args = get_default_arg()
         self.local_args = local_args
         
     def hp_space(self,trial):
         
-        args = copy.deepcopy(self.local_args)
-        
+        args = copy.deepcopy(self.default_args)
         args.update({
             'learning_rate': trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
-            'adam_beta1': 0.9,
-            'adam_beta2': 0.999,
-            'adam_epsilon': 1e-08,
             'weight_decay': trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True),
-            'lr_scheduler_type': 'linear',
             'warmup_steps': trial.suggest_float("warmup_steps", 1, 1000, log=True),
             'optim': trial.suggest_categorical("optim", ["adafactor", "adamw_torch"]),
         })
+        args.update(self.local_args)
         
         return args
     
     def model_init(self,trial):
         
-        args = copy.deepcopy(self.local_args)
-        
+        args = copy.deepcopy(self.default_args)
         args.update({
             'resolution': trial.suggest_categorical("resolution", [0.005, 0.01, 0.02]),
-            'num_encoders': trial.suggest_int("num_encoders", 5, 12),  
+            'num_encoders': None # trial.suggest_int("num_encoders", 5, 12),  
             'num_convprojs': trial.suggest_int("num_convprojs", 1, 5),
             'conv_hid_actv': trial.suggest_categorical("conv_hid_actv", ["gelu", "relu","none"]),
             'freeze_encoder': True
         })
+        args.update(self.local_args)
         
         model = CustomWav2Vec2Segmentation(**args)
-        
         return model
+    
+    def get_updated_non_tunable_arguments(self):
+        args = copy.deepcopy(self.default_args)
+        args.update(self.local_args)
+        return args
 
     
 def hyperparameter_optimization(args):
@@ -294,11 +295,14 @@ def hyperparameter_optimization(args):
 
 def hyperparameter_optimization_with_trainer_api(args):
     
-    trainset = PhonemeDetailsDataset_(_set='train',**args)
-    validaset = PhonemeDetailsDataset_(_set='dev',**args)
-    data_collator = TrainingDataProcessor_(**args)
+
     
     helper = HyperOptHelper(args)
+    ntune_args = helper.get_updated_non_tunable_arguments()
+    trainset = PhonemeDetailsDataset_(_set='train',**ntune_args)
+    validaset = PhonemeDetailsDataset_(_set='dev',**ntune_args)
+    data_collator = TrainingDataProcessor_(**ntune_args)
+    
     training_args = TrainingArguments(**set_training_arguments(args))
     callbacks = callbacks = get_callbacks(args)
     
@@ -321,6 +325,7 @@ def hyperparameter_optimization_with_trainer_api(args):
         hp_space=helper.hp_space,
         n_trials=args['n_trials'],
     )
+    print(best_trial)
     return
 
 
