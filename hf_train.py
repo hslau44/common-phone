@@ -109,10 +109,16 @@ def set_training_arguments(args):
         if k in ACCEPT_TRAINARGS:
             training_args[k] = v
     
-    training_args.update(
-        output_dir=args['output_data_dir'],
-        logging_dir=None,
-    )
+    if 'model_dir' in args.keys():
+        training_args.update(
+            output_dir=args['model_dir'],
+            logging_dir=args['output_data_dir'],
+        )
+    else:
+        training_args.update(
+            output_dir=args['output_data_dir'],
+            logging_dir=None,
+        )
     return training_args
 
 
