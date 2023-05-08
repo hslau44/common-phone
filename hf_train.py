@@ -232,9 +232,10 @@ class Objective_class(object):
         return args
     
     def exp_code_ops(self,args):
-        output_dir = args['output_data_dir']
         exp_code = get_datetime()
-        args['output_data_dir'] = os.path.join(output_dir,exp_code)
+        args['output_data_dir'] = os.path.join(args['output_data_dir'],exp_code)
+        if 'model_dir' in args.keys():
+            args['model_dir'] = os.path.join(args['model_dir'],exp_code)
         return args
 
 
