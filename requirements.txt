@@ -10,3 +10,4 @@ optuna
 tensorboard
 protobuf==3.20.*
 tensorboardX
+ray[tune]

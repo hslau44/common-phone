@@ -11,8 +11,9 @@ from transformers import (
     TrainingArguments,
     EarlyStoppingCallback, 
     ProgressCallback,
-    TensorBoardCallback,
+    # TensorBoardCallback,
 )
+from ray import tune
 from segmentation import (
     PhonemeDetailsDataset, 
     PhonemeSegmentor, 
@@ -135,7 +136,7 @@ def get_callbacks(args):
     callbacks = [
         EarlyStoppingCallback(patient,threshold),
         ProgressCallback(),
-        TensorBoardCallback(),
+        # TensorBoardCallback(),
     ]
     return callbacks
 
@@ -246,6 +247,7 @@ class HyperOptHelper:
     def __init__(self,local_args):
         self.default_args = get_default_arg()
         self.local_args = local_args
+        self.full_args = None
         
     def hp_space(self,trial):
         
@@ -256,22 +258,26 @@ class HyperOptHelper:
             'warmup_steps': trial.suggest_float("warmup_steps", 1, 1000, log=True),
             'optim': trial.suggest_categorical("optim", ["adafactor", "adamw_torch"]),
         })
+        
+        model_args = {
+            'resolution': trial.suggest_categorical("resolution", [0.005, 0.01, 0.02]),
+            'num_encoders': None, # trial.suggest_int("num_encoders", 5, 12),  
+            'num_convprojs': trial.suggest_int("num_convprojs", 1, 5),
+            'conv_hid_actv': trial.suggest_categorical("conv_hid_actv", ["gelu", "relu","none"]),
+            'freeze_encoder': True,
+        }
+        args.update(model_args)
+        
         args.update(self.local_args)
+        
+        self.full_args = args
         
         return args
     
     def model_init(self,trial):
         
-        args = copy.deepcopy(self.default_args)
-        args.update({
-            'resolution': trial.suggest_categorical("resolution", [0.005, 0.01, 0.02]),
-            'num_encoders': None, # trial.suggest_int("num_encoders", 5, 12),  
-            'num_convprojs': trial.suggest_int("num_convprojs", 1, 5),
-            'conv_hid_actv': trial.suggest_categorical("conv_hid_actv", ["gelu", "relu","none"]),
-            'freeze_encoder': True
-        })
-        args.update(self.local_args)
-        
+        args = copy.deepcopy(self.full_args)
+
         model = CustomWav2Vec2Segmentation(**args)
         return model
     
@@ -334,15 +340,16 @@ def hyperparameter_optimization_with_trainer_api(args):
 
 if __name__ == "__main__":
     # local setting
-    args['mode'] = 'train'
+    args = {}
+    args['mode'] = 'debug'
     args['datadir'] = 'data'
     args['output_data_dir'] = 'outputs/exp_05'
     args['tf32'] = False
     args['per_device_train_batch_size'] = 2
     args['per_device_eval_batch_size'] = 2
-    args['num_train_epochs'] = 40
-    args['n_trials'] = 16
+    args['num_train_epochs'] = 2
+    args['n_trials'] = 2
     
-    hyperparameter_optimization(args)
+    hyperparameter_optimization_with_trainer_api(args)
     
     
