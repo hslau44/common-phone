@@ -11,6 +11,7 @@ from transformers import (
     TrainingArguments,
     EarlyStoppingCallback, 
     ProgressCallback,
+    TensorBoardCallback,
 )
 from segmentation import (
     PhonemeDetailsDataset, 
@@ -134,6 +135,7 @@ def get_callbacks(args):
     callbacks = [
         EarlyStoppingCallback(patient,threshold),
         ProgressCallback(),
+        TensorBoardCallback(),
     ]
     return callbacks
 
