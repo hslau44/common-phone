@@ -1,6 +1,8 @@
 import argparse
 import json
+import ast
 
+LITERAL_TO_BOOL = {'true': True, 'false': False, 'True': True, 'False': False}
 ARGS_FILEPATHS = [
     'training_config.json',
     'segmentation_config.json',
@@ -10,7 +12,8 @@ ARGS_FILEPATHS = [
 def write_json(items,fp):
     with open(fp, 'w') as file:
         json.dump(items, file)
-        
+
+
 def read_json(fp):
     with open(fp,'r') as file:
         data = json.load(file)
@@ -31,16 +34,10 @@ def extract_args_by_default_config(args,default_config):
     return config
 
 
-def add_argument_from_default_config(parser,default_config, add_as_default=None):
-    for k,v in default_config.items():
-        default_value = None
-        if add_as_default:
-            default_value = v
-        if isinstance(v,list):
-            parser.add_argument(f"--{k}", nargs='+', type=type(v[0]), default=default_value)
-        else:
-            parser.add_argument(f"--{k}", type=type(v), default=default_value)
-        
+def add_argument_from_default_config(parser, default_config):
+    for k in default_config.keys():
+        parser.add_argument(f"--{k}", type=str)
+
 
 def set_argparser_by_default_configs(*config_files):
     configs = [read_json(config_file) for config_file in config_files]
@@ -48,3 +45,25 @@ def set_argparser_by_default_configs(*config_files):
     for config in configs:
         add_argument_from_default_config(parser,config)
     return parser
+
+
+def process_namespace_arguments(namespace_args, default_config=None, add_default_value=False):
+    args = {}
+    for k, v in vars(namespace_args).items():
+        if k in default_config.keys():
+            default_value = default_config[k]
+            if v is None:
+                if add_default_value:
+                    args[k] = default_value
+                else:
+                    continue
+            else:
+                if isinstance(default_value, str):
+                    args[k] = v
+                elif isinstance(default_value, bool):
+                    args[k] = LITERAL_TO_BOOL[v]
+                else:
+                    args[k] = eval(v)
+        else:
+            args[k] = v
+    return args
