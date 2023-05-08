@@ -8,3 +8,4 @@ datasets
 evaluate
 optuna
 tensorboard
+protobuf==3.20.*
