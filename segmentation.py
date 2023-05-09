@@ -294,9 +294,12 @@ def nll_loss(logits,labels):
 # metric
 def avg_sample_acc(predictions, references):
     """calculate the accuracy of each sample in a batch and average the score"""
-    assert len(predictions) == len(references), f"length not equal: {len(predictions)} != {len(references)}"
-    assert len(predictions.shape) == 3 and len(references.shape) == 2
-    assert predictions.shape[1] == references.shape[1]
+    if len(predictions) != len(references):
+        raise ValueError(f"length not equal: {len(predictions)} != {len(references)}")
+    if predictions.shape[1] != references.shape[1]:
+        raise ValueError(f"Time interval not equal")
+    if len(predictions.shape) != 3 or len(references.shape) != 2:
+        raise ValueError("Dim not correct")
     predictions = np.argmax(predictions,axis=-1) 
     sample_accs = [metrics.accuracy_score(ref,pred) for ref,pred in zip(references,predictions)]
     avg = np.mean(sample_accs)
