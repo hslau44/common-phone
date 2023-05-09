@@ -95,13 +95,6 @@ def hp_space(trial):
     args['early_stopping_threshold'] = 0.0
     args['load_best_model_at_end'] = True
     
-#     # local setting
-#     args['datadir'] = 'data'
-#     args['output_data_dir'] = 'outputs/exp_04'
-#     args['tf32'] = False
-#     args['per_device_train_batch_size'] = 2
-#     args['per_device_eval_batch_size'] = 2
-    
     return args
 
 
