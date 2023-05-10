@@ -1,4 +1,5 @@
 import os
+import argparse
 import copy
 import datetime
 import joblib
@@ -23,7 +24,12 @@ from segmentation import (
     compute_avg_sample_acc,
 )
 from models import CustomWav2Vec2Segmentation
-from utils import read_json, get_default_arg
+from utils import (
+    read_json,
+    get_default_arg,
+    add_argument_from_default_config,
+    process_namespace_arguments,
+)
 
 
 # compute config
@@ -338,9 +344,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     add_argument_from_default_config(parser, all_config)
-
+    
+    parser.add_argument('--datadir', type=str, default='data')
     parser.add_argument("--output_data_dir", type=str, default='outputs')
-    parser.add_argument("--action", type=str)	
+    parser.add_argument("--action", type=str)
 
     args, _ = parser.parse_known_args()
     input_args = process_namespace_arguments(args, all_config)
