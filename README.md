@@ -33,8 +33,12 @@ where:
 
 Run the following command:     
 ```
-python segmentation.py --arg ARG
+python hf_train.py --arg ARG
 ```
-where `arg` and `ARG` can be any given key-value pair in `segmentation_config.json` and `training_config.json`. No need to specific the config the arg key-value pair is come from.   
+where `arg` and `ARG` can be any given key-value pair in `segmentation_config.json` and `training_config.json`. In additon, the following arguments need to be specified:   
+
+* `--datadir` the data dir of common phone
+* `--output_data_dir`: the output dir
+* `--action`: use `train` 
 
 For training in AWS Sagemaker Training, you can follow the [official instruction](https://huggingface.co/docs/sagemaker/index) and use `sagemaker_entry.py` as entry_point
