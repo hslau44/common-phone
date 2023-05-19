@@ -1,7 +1,10 @@
+import os
+import soundfile as sf
 import numpy as np
 import torch
+from torch.utils.data import Dataset, DataLoader
 from transformers import AutoConfig, AutoTokenizer
-from .segmentation import PhonemeSegmentor
+from .segmentation import PhonemeSegmentor, get_metadata
 from .config import ROOT_DIR
 
 
@@ -30,12 +33,12 @@ class BatchProcessor(BaseProcessor):
         return inputs
     
     def from_batch(self,inputs):
-        length = list(inputs.keys())[0]
+        length = len(inputs[list(inputs.keys())[0]])
         rows = []
         for i in range(length):
             row = {}
             for key in inputs.keys():
-                row[key] = outputs[key][i]
+                row[key] = inputs[key][i]
             rows.append(row)
         return rows
 
@@ -109,3 +112,94 @@ class PhonemeDetailProcessor(BatchProcessor):
     
     def to_batch(self,inputs):
         return super().to_batch(inputs).long()
+    
+    def inverse_transform(self,inputs):
+        outputs = self.from_batch(inputs)
+        for i in range(len(outputs)):
+            row = outputs[i]
+            row = self.process_row(row)
+            outputs[i] = row
+        return outputs
+
+    def process_row(self,row):
+        logits = row['logits']
+        row['labels'] = self.process_logits(logits)
+        row.pop('logits')
+        return row
+
+    def process_logits(self,logits):
+        arr = logits.detach().numpy()
+        arr = np.argmax(arr,-1)
+        labels = self.segmentor.decode(arr)
+        return labels
+
+
+class TrainingDataProcessor(BaseProcessor):
+
+    def __init__(self,model_checkpoint,sampling_rate,resolution,t_end,rtn_type='pt',**kwargs):
+        self.arr_processor = AudioArrayProcessor(
+            t_end=t_end,
+            sampling_rate=sampling_rate,
+            rtn_type=rtn_type
+        )
+        self.label_processor = PhonemeDetailProcessor(
+            model_checkpoint=model_checkpoint,
+            resolution=resolution,
+            t_end=t_end,
+            rtn_type=rtn_type
+        )
+
+    def transform(self,inputs):
+        batch = {}
+        batch.update(self.arr_processor.transform(inputs))
+        batch.update(self.label_processor.transform(inputs))
+        return batch
+
+    def __call__(self,inputs):
+        return self.transform(inputs)
+
+
+# Data generator
+class PhonemeDetailsDataset(Dataset):
+
+    def __init__(self,metadata,data_dir='data'):
+        self.metadata = metadata
+        self.data_dir = data_dir
+
+    def __len__(self):
+        return len(self.metadata)
+
+    def __getitem__(self,idx):
+        row = self.metadata.iloc[idx,:]
+        # audio input
+        fpath = os.path.join(self.data_dir,row['file_name'])
+        audio_input,sr = sf.read(fpath)
+        # label
+        label = row['phonetic_detail']
+        # inputs
+        example = {"input_values":audio_input,"labels":label}
+        return example
+
+
+class SegmentationDataLoader(DataLoader):
+
+    def __init__(self,data_dir,model_checkpoint,sampling_rate,resolution,t_end,_set,**kwargs):
+        metadata_fp = os.path.join(data_dir,"metadata.csv")
+        _locale = None
+        if _set == 'test':
+            _locale = kwargs.get('test_locales')
+        else:
+            _locale = kwargs.get('train_locales')
+        metadata = get_metadata(path=metadata_fp,_locale=_locale,_set=_set)
+        dataset = PhonemeDetailsDataset(metadata,data_dir=data_dir)
+        collate_fn = TrainingDataProcessor(
+            model_checkpoint=model_checkpoint,
+            sampling_rate=sampling_rate,
+            resolution=resolution,
+            t_end=t_end,
+            rtn_type='pt',
+        )
+        batch_size = kwargs.get('batch_size',1)
+        shuffle = kwargs.get('shuffle',None)
+        num_workers = kwargs.get('num_workers',0)
+        super().__init__(dataset=dataset,collate_fn=collate_fn,batch_size=batch_size,shuffle=shuffle,num_workers=num_workers)
