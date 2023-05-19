@@ -1,12 +1,15 @@
+import os
 import argparse
 import json
 import ast
+from .config import ARGS_FILEPATHS
 
 LITERAL_TO_BOOL = {'true': True, 'false': False, 'True': True, 'False': False}
-ARGS_FILEPATHS = [
-    'training_config.json',
-    'segmentation_config.json',
-]
+
+# ARGS_FILEPATHS = [
+#     'training_config.json',
+#     'segmentation_config.json',
+# ]
 
 
 def write_json(items,fp):

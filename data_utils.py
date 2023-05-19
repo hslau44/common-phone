@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 from transformers import AutoConfig, AutoTokenizer
+from .segmentation import PhonemeSegmentor
+from .config import ROOT_DIR
 
 
 class BaseProcessor(object):
@@ -79,7 +81,7 @@ class PhonemeDetailProcessor(BatchProcessor):
         pad_token="(...)"
         unk_token="UNK"
         tokenizer = AutoTokenizer.from_pretrained(
-          "./",
+          ROOT_DIR, # "./",
           config=hf_config,
           tokenizer_type=tokenizer_type,
           unk_token=unk_token,

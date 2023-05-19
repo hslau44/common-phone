@@ -5,7 +5,7 @@ from utils import (
     add_argument_from_default_config,
     process_namespace_arguments,
 )
-from hf_train import hyperparameter_optimization_with_trainer_api, objective
+from .hf_train import hyperparameter_optimization_with_trainer_api, objective
 
 if __name__ == "__main__":
 
