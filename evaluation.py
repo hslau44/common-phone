@@ -1,6 +1,6 @@
 import os
 from sklearn import metrics
-from segmentation import get_metadata, PhonemeDetailsDataset
+from .segmentation import get_metadata, PhonemeDetailsDataset
 
 
 class Evaluator(object):
