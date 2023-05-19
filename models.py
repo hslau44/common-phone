@@ -121,3 +121,13 @@ class CustomWav2Vec2Segmentation(nn.Module):
                 if i in layer_nums:
                     for param in layer.parameters():
                         param.requires_grad = state
+
+
+class BaseModel(nn.Module):
+    
+    def __init__(self,config):
+        self.config = config
+        super().__init__()
+    
+    def forward(self,inputs:list) -> list:
+        raise NotImplementedError()
