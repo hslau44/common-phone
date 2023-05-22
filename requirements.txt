@@ -13,3 +13,6 @@ tensorboardX
 ray[tune]
 lightning
 lightning-bolts
+torchserve
+torch-model-archiver
+torch-workflow-archiver
