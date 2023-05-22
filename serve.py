@@ -54,13 +54,13 @@ class PhonemeSegModelHandler(BaseHandler, ABC):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.data_worker = AudioArrayProcessor(**config)
         self.label_worker = PhonemeDetailProcessor(**config)
-        self.model = self.loaded_model(config)
+        self.model = self._load_model(config)
         self.model.to(self.device)
         self.model.eval()
         
         self.initialized = True
     
-    def loaded_model(self,config):
+    def _load_model(self,config):
         
         model_cls = getattr(models,config['model_cls'])
         model = model_cls(**config)
@@ -99,8 +99,13 @@ class CustomWav2Vec2SegmentationHandler(PhonemeSegModelHandler):
     def __init__(self):
         super().__init__()
         
-    def loaded_model(self,config):
-        return CustomWav2Vec2Segmentation(**config)
+    def _load_model(self,config):
+        model = CustomWav2Vec2Segmentation(**config)
+        model_fp = config['model_dir']
+        load_device = torch.device('cpu')
+        state_dict = torch.load(model_fp,map_location=load_device)
+        model.load_state_dict(state_dict, strict=True)
+        return model
     
     def inference(self, inputs):
         if inputs.get('labels'):
