@@ -21,6 +21,7 @@ from .data_utils import (
     TrainingDataProcessor, 
     get_metadata,
     compute_avg_sample_acc,
+    nll_loss,
 )
 from .models import CustomWav2Vec2Segmentation
 from .utils import (
@@ -138,8 +139,6 @@ def get_callbacks(args):
     ]
     return callbacks
 
-from transformers import Trainer
-from .data_utils import nll_loss
 
 # trainer
 class CustomTrainer(Trainer):
