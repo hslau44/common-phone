@@ -2,7 +2,7 @@ import torch
 import lightning.pytorch as pl
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
-from .segmentation import nll_loss, avg_sample_acc
+from .data_utils import nll_loss, avg_sample_acc
 
 
 class PTLModel(pl.LightningModule):

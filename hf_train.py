@@ -15,12 +15,11 @@ from transformers import (
     # TensorBoardCallback,
 )
 from ray import tune
-from .segmentation import (
+from .data_utils import (
     PhonemeDetailsDataset, 
     PhonemeSegmentor, 
     TrainingDataProcessor, 
-    get_metadata, 
-    CustomTrainer,
+    get_metadata,
     compute_avg_sample_acc,
 )
 from .models import CustomWav2Vec2Segmentation
