@@ -368,7 +368,17 @@ class PhonemeDetailsDataset(Dataset):
             where metadata.csv is located, default 'data'
     
     """
-    def __init__(self,metadata,data_dir='data'):
+    def __init__(self,_set,mode,**kwargs):
+        data_dir = kwargs['datadir'] # <------- find correct arg name
+        path = os.path.join(data_dir,'metadata.csv')
+        if _set == 'test':
+            _locale = kwargs['test_locales']
+        else:
+            _locale = kwargs['train_locales']
+        metadata = get_metadata(path=path,_set=_set,_locale=_locale)
+        if mode == 'debug':
+            metadata = metadata.copy().iloc[:64,:]
+            metadata.reset_index(drop=True, inplace=True)
         self.metadata = metadata
         self.data_dir = data_dir
 

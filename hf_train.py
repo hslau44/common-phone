@@ -181,49 +181,49 @@ def objective(args):
     return score
 
 
-class PhonemeDetailsDataset_(PhonemeDetailsDataset):
+# class PhonemeDetailsDataset_(PhonemeDetailsDataset):
     
-    def __init__(self,_set,mode,**kwargs):
-        data_dir = kwargs['datadir'] # <------- find correct arg name
-        path = os.path.join(data_dir,'metadata.csv')
-        if _set == 'test':
-            _locale = kwargs['test_locales']
-        else:
-            _locale = kwargs['train_locales']
-        metadata = get_metadata(path=path,_set=_set,_locale=_locale)
-        if mode == 'debug':
-            metadata = metadata.copy().iloc[:64,:]
-            metadata.reset_index(drop=True, inplace=True)
-        super().__init__(metadata,data_dir)
+#     def __init__(self,_set,mode,**kwargs):
+#         data_dir = kwargs['datadir'] # <------- find correct arg name
+#         path = os.path.join(data_dir,'metadata.csv')
+#         if _set == 'test':
+#             _locale = kwargs['test_locales']
+#         else:
+#             _locale = kwargs['train_locales']
+#         metadata = get_metadata(path=path,_set=_set,_locale=_locale)
+#         if mode == 'debug':
+#             metadata = metadata.copy().iloc[:64,:]
+#             metadata.reset_index(drop=True, inplace=True)
+#         super().__init__(metadata,data_dir)
 
 
-class TrainingDataProcessor_(TrainingDataProcessor):
+# class TrainingDataProcessor_(TrainingDataProcessor):
     
-    def __init__(self,model_checkpoint,sampling_rate,resolution,t_end,pad_to_sec,**kwargs):
-        # model and data-processor config 
-        hf_config = AutoConfig.from_pretrained(model_checkpoint)
-        tokenizer_type = hf_config.model_type if hf_config.tokenizer_class is None else None
-        hf_config = hf_config if hf_config.tokenizer_class is not None else None
+#     def __init__(self,model_checkpoint,sampling_rate,resolution,t_end,pad_to_sec,**kwargs):
+#         # model and data-processor config 
+#         hf_config = AutoConfig.from_pretrained(model_checkpoint)
+#         tokenizer_type = hf_config.model_type if hf_config.tokenizer_class is None else None
+#         hf_config = hf_config if hf_config.tokenizer_class is not None else None
 
-        pad_token="(...)"
-        unk_token="UNK"
-        tokenizer = AutoTokenizer.from_pretrained(
-          "./",
-          config=hf_config,
-          tokenizer_type=tokenizer_type,
-          unk_token=unk_token,
-          pad_token=pad_token,
-        )
+#         pad_token="(...)"
+#         unk_token="UNK"
+#         tokenizer = AutoTokenizer.from_pretrained(
+#           "./",
+#           config=hf_config,
+#           tokenizer_type=tokenizer_type,
+#           unk_token=unk_token,
+#           pad_token=pad_token,
+#         )
 
-        segmentor = PhonemeSegmentor(tokenizer=tokenizer,resolution=resolution,pad_token=pad_token)
+#         segmentor = PhonemeSegmentor(tokenizer=tokenizer,resolution=resolution,pad_token=pad_token)
         
-        super().__init__(
-            sampling_rate=sampling_rate,
-            resolution=resolution, 
-            t_end=t_end, 
-            pad_to_sec=pad_to_sec, 
-            tokenizer=segmentor 
-        )
+#         super().__init__(
+#             sampling_rate=sampling_rate,
+#             resolution=resolution, 
+#             t_end=t_end, 
+#             pad_to_sec=pad_to_sec, 
+#             tokenizer=segmentor 
+#         )
 
 
 class Objective_class(object):
