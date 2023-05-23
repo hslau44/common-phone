@@ -88,6 +88,7 @@ class PhonemeSegModelHandler(BaseHandler, ABC):
         config = ctx.system_properties
             
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.data_loader = Audioloader(**config)
         self.data_worker = AudioArrayProcessor(**config)
         self.label_worker = PhonemeDetailProcessor(**config)
         self.model = self._load_model(config)
@@ -108,7 +109,7 @@ class PhonemeSegModelHandler(BaseHandler, ABC):
             
         logger.info(f"Received number of filepaths: {len(data)}")
         
-        audio_arrays = [{'input_values':sf.read(fpath)} for fpath in data]
+        audio_arrays = self.data_loader(data)
 
         inputs = self.data_worker(audio_arrays)
         
