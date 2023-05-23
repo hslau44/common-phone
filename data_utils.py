@@ -1,11 +1,173 @@
 import os
 import soundfile as sf
 import numpy as np
+import pandas as pd
+import soundfile as sf
+from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoConfig, AutoTokenizer
-from .segmentation import PhonemeSegmentor, get_metadata
 from .config import ROOT_DIR
+
+
+def get_metadata(path,_set=None,_locale=None):
+    """
+    Return metadata with specific set and locale
+    
+    Args
+    ----
+        path : str
+            filepath of metadata.csv
+        _set : str/list[str]/bool
+            the set(s) it contains, only support combination 
+            of ['train','dev','test'], default None to select 
+            all sets
+        _locale:
+            the locale(s) it contain, default None to select 
+            all sets
+    
+    Return
+    ------
+        metadata : pd.DataFrame
+            selected metadata 
+    """
+    metadata = pd.read_csv(path)
+    if _set is not None:
+        if isinstance(_set,list):
+            metadata = metadata[(metadata['set'].isin(_set))]
+        else:
+            metadata = metadata[(metadata['set'] == _set)]
+    if _locale is not None:
+        if isinstance(_locale,list):
+            metadata = metadata[(metadata['locale'].isin(_locale))]
+        else:
+            metadata = metadata[(metadata['locale'] == _locale)]
+    return metadata
+
+
+def get_vocab_dict(data,pad=None,unk=None):
+    """
+    Return dictionary of token from a sequence of 
+    phonemes_detail in the metadata
+    
+    Args
+    ----
+        data : list[str]
+            sequence of phonemes_detail, this method will transform
+            the string in phonemes_detail as dict 
+        pad : str
+            padding tokken, default : 'PAD'
+        unk: str
+            unknown tokken, default : 'UNK'
+    
+    Return
+    ------
+        vocab_dict : dict
+            dictionary of token
+            
+    Example
+    -------
+    
+        pad = '[PAD]'
+        unk = '[UNK]'
+        data = metadata['phonemes_detail']
+        vocab_dict = get_vocab_dict(data,pad,unk)
+        
+    """
+    pad = 'PAD' if pad is None else pad
+    unk = 'UNK' if unk is None else unk
+    dictionary = {pad:0}
+    lb = 1
+    for phonemes_detal in tqdm(data):
+        phonemes_detal = eval(phonemes_detal)
+        phonemes = phonemes_detal['label']
+        for phoneme in phonemes:
+            if phoneme not in dictionary.keys():
+                dictionary[phoneme] = lb
+                lb += 1
+    dictionary['UNK'] = lb
+    return dictionary
+
+
+class PhonemeSegmentor:
+    """
+
+
+    """
+    def __init__(self,tokenizer,resolution,t_end=None,pad_token="[PAD]"):
+        self.tokenizer = tokenizer
+        self.t_end = t_end
+        self.resolution = resolution
+        self.pad_token = pad_token
+        pass
+    
+    def encode(self,phonemes_detal,**kwargs):
+        t_end = kwargs.get('t_end',self.t_end) if kwargs.get('t_end',self.t_end) else self.get_t_end(phonemes_detal)
+        arr = [self.tokenizer.encode(self.pad_token)[0] for _ in range(int(np.round(t_end/self.resolution)))]
+        phonemes_detal = eval(phonemes_detal) if type(phonemes_detal) is not dict else phonemes_detal
+        for a,b,label in zip(phonemes_detal['start'],phonemes_detal['end'],phonemes_detal['label']):
+            a = int(np.round(a/self.resolution))
+            b = int(np.round(b/self.resolution))
+            arr[a:b] = [self.tokenizer.encode(label)[0]]*len(arr[a:b])
+        return arr
+    
+    def decode(self,arr):
+        dec = len(str(self.resolution).split(".")[1]) if not isinstance(self.resolution,int) else 0
+        d = {k:[] for k in ['start','end','label']}
+        a = 0*self.resolution
+        if len(arr) == 1:
+            i = 0
+            d['start'].append(round(a*self.resolution,dec))
+            d['end'].append(round((i+1)*self.resolution,dec))
+            label = self.tokenizer.decode(arr[i])
+            d['label'].append(label)
+        else:
+            for i in range(len(arr)-1):
+                if arr[i+1] != arr[i]:  
+                    d['start'].append(round(a*self.resolution,dec))
+                    d['end'].append(round((i+1)*self.resolution,dec))
+                    label = self.tokenizer.decode(arr[i])
+                    d['label'].append(label)
+                    a = i+1
+            d['start'].append(round(a*self.resolution,dec))
+            d['end'].append(round((i+2)*self.resolution,dec))
+            label = self.tokenizer.decode(arr[i])
+            d['label'].append(label)
+        return d
+    
+    def get_t_end(self,phonemes_detal):
+        phonemes_detal = eval(phonemes_detal) if type(phonemes_detal) is not dict else phonemes_detal
+        return phonemes_detal['label'][-1]
+
+
+# loss    
+def nll_loss(logits,labels):
+    logits = logits.reshape(-1,logits.shape[-1])
+    labels = labels.flatten()
+    loss = torch.nn.functional.cross_entropy(logits, labels, reduction="mean")
+    return loss
+
+
+# metric
+def avg_sample_acc(predictions, references):
+    """calculate the accuracy of each sample in a batch and average the score"""
+    if len(predictions) != len(references):
+        raise ValueError(f"length not equal: {len(predictions)} != {len(references)}")
+    if predictions.shape[1] != references.shape[1]:
+        raise ValueError(f"Time interval not equal")
+    if len(predictions.shape) != 3 or len(references.shape) != 2:
+        raise ValueError("Dim not correct")
+    predictions = np.argmax(predictions,axis=-1) 
+    sample_accs = [metrics.accuracy_score(ref,pred) for ref,pred in zip(references,predictions)]
+    avg = np.mean(sample_accs)
+    return {'avg_sample_acc': avg}
+    
+
+def compute_avg_sample_acc(pred):
+    """wrapping function to feed HF style prediction into metric """
+    p = pred.predictions
+    r = pred.label_ids
+    return avg_sample_acc(p, r)
 
 
 class BaseProcessor(object):
@@ -75,7 +237,7 @@ class AudioArrayProcessor(BatchProcessor):
     
 
 class PhonemeDetailProcessor(BatchProcessor):
-    
+
     def __init__(self,model_checkpoint,resolution,t_end,rtn_type='pt',**kwargs):
         hf_config = AutoConfig.from_pretrained(model_checkpoint)
         tokenizer_type = hf_config.model_type if hf_config.tokenizer_class is None else None
@@ -135,7 +297,31 @@ class PhonemeDetailProcessor(BatchProcessor):
 
 
 class TrainingDataProcessor(BaseProcessor):
-
+    """
+    Object that collates samples generated by 
+    PhonemeDetailsDataset as batch with desired format for 
+    huggingface transformers models to read.  
+    Can use as collate_fn for Pytorch Dataloader arguments
+    
+    Attributes
+    ---
+        sampling_rate: int
+            sampeling rate of the audio 
+        resolution: float
+            resolution of label segment in second 
+        tokenizer: PhonemeSegmentor
+            tokenizer to translate phoneme_detail to array 
+            with size (batch,t,num_label), where t is 
+            t_end/resolution
+        t_end: int
+            length of array in sencod 
+        pad_to_sec: int
+            nearest second the array pad to 
+        rtn_type: str
+            tensor type to be return, currently only 
+            support pytorch 'pt' 
+            
+    """
     def __init__(self,model_checkpoint,sampling_rate,resolution,t_end,rtn_type='pt',**kwargs):
         self.arr_processor = AudioArrayProcessor(
             t_end=t_end,
@@ -161,7 +347,27 @@ class TrainingDataProcessor(BaseProcessor):
 
 # Data generator
 class PhonemeDetailsDataset(Dataset):
-
+    """
+    Pytorch Dataset read the row of the metadata and returns 
+    the follows items as dict:
+        input_values: np.ndarray
+            the audio array loaded by reading the column 
+            'file_name' of a row in the metadata
+        labels: str
+            phonetic segmentation in string extract directly
+            from column 'phonetic_detail' of a row in the
+            metadata
+    
+    Attributes
+    ---
+        metadata: pd.DataFrame
+            a pandas dataframe object that contains the 
+            informations about the audio 
+        data_dir: str
+            the directory of all data, same as the directory 
+            where metadata.csv is located, default 'data'
+    
+    """
     def __init__(self,metadata,data_dir='data'):
         self.metadata = metadata
         self.data_dir = data_dir

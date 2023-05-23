@@ -139,6 +139,19 @@ def get_callbacks(args):
     ]
     return callbacks
 
+from transformers import Trainer
+from .data_utils import nll_loss
+
+# trainer
+class CustomTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False):
+        labels = inputs.get("labels")
+        # forward pass
+        outputs = model(**inputs)
+        logits = outputs.get("logits")
+        loss = nll_loss(logits,labels)
+        return (loss, outputs) if return_outputs else loss
+
 
 def objective(args):
     
