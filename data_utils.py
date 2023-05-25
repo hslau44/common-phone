@@ -2,6 +2,7 @@ import os
 import soundfile as sf
 import numpy as np
 import pandas as pd
+import librosa
 import soundfile as sf
 from tqdm import tqdm
 import torch
@@ -87,6 +88,42 @@ def get_vocab_dict(data,pad=None,unk=None):
                 lb += 1
     dictionary['UNK'] = lb
     return dictionary
+
+
+class Audioloader:
+    
+    def __init__(self,sampling_rate,**kwargs):
+        self.sampling_rate = sampling_rate
+        self.fpath_key = 'file_name'
+        self.arr_key = 'input_values'
+    
+    def __call__(self,data):
+        if isinstance(data[0],dict):
+            data = self._process_dics(data)
+        elif isinstance(data[0],str):
+            data = self._process_fpaths(data)
+        else:
+            raise ValueError("incorrect input format")
+        return data 
+    
+    def _process_dics(self,dics):
+        for dic in dics:
+            fpath = dic[self.fpath_key]
+            arr = self._load_audio(fpath)
+            dic[self.arr_key] = arr
+        return dics
+    
+    def _process_fpaths(self,fpaths):
+        data = []
+        for fpath in fpaths:
+            arr = self._load_audio(fpath)
+            dic = {self.arr_key:arr}
+            data.append(dic)
+        return data
+    
+    def _load_audio(self,fpath):
+        arr, _ = librosa.load(fpath,sr=self.sampling_rate)
+        return arr
 
 
 class PhonemeSegmentor:

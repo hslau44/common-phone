@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import importlib
-import librosa
 import torch
 from ts.torch_handler.base_handler import BaseHandler
 from . import models
@@ -36,41 +35,6 @@ logger = logging.getLogger(__name__)
 #     def loaded_model(self,config,model_cls,save_path):
 #         model = model_cls(**config)
 #         return model
-
-class Audioloader:
-    
-    def __init__(self,sampling_rate,**kwargs):
-        self.sampling_rate = sampling_rate
-        self.fpath_key = 'file_name'
-        self.arr_key = 'input_values'
-    
-    def __call__(self,data):
-        if isinstance(data[0],dict):
-            data = self._process_dics(data)
-        elif isinstance(data[0],str):
-            data = self._process_fpaths(data)
-        else:
-            raise ValueError("incorrect input format")
-        return data 
-    
-    def _process_dics(self,dics):
-        for dic in dics:
-            fpath = dic[self.fpath_key]
-            arr = self._load_audio(fpath)
-            dic[self.arr_key] = arr
-        return dics
-    
-    def _process_fpaths(self,fpaths):
-        data = []
-        for fpath in fpaths:
-            arr = self._load_audio(fpath)
-            dic = {self.arr_key:arr}
-            data.append(dic)
-        return data
-    
-    def _load_audio(self,fpath):
-        arr, _ = librosa.load(fpath,sr=self.sampling_rate)
-        return arr
   
     
 class PhonemeSegModelHandler(BaseHandler, ABC):
