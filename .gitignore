@@ -1,4 +1,8 @@
 data/
+model/
+outputs/
+Dockerfiles/
+sagemaker_utilities/
 __pycache__/
 .ipynb_checkpoints/
 
